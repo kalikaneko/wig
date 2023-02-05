@@ -1,0 +1,193 @@
+---
+
+- hosts: all
+  gather_facts: false
+  tasks:
+    - set_fact:
+        apt_proxy: "{{ lookup('env', 'APT_PROXY') }}"
+
+    - name: Setup APT proxy
+      copy:
+        dest: "/etc/apt/apt.conf.d/90proxy"
+        content: |
+          Acquire::http::Proxy "http://{{ apt_proxy }}/";
+          Acquire::https::Proxy "http://{{ apt_proxy }}/";
+      when: "apt_proxy != ''"
+
+    - name: Update packages
+      apt:
+        update_cache: true
+
+    - set_fact:
+        gw_ip: "172.19.1.1"
+        gw_ip_cidr: "172.19.1.1/16"
+        peer_ip: "172.19.2.109"
+        peer_ip_cidr: "172.19.2.109/32"
+
+- hosts: gateway
+  gather_facts: false
+  tasks:
+    - name: Install executable
+      copy:
+        src: "../wig"
+        dest: "/usr/bin/wig"
+        mode: "0755"
+
+    - name: Install required packages
+      apt:
+        name: "{{ packages }}"
+        state: present
+      vars:
+        packages:
+          - wireguard
+          - netcat-openbsd
+
+    - name: Create private key
+      command: "wg genkey"
+      register: wg_private_key_command
+
+    - set_fact:
+        wg_private_key: "{{ wg_private_key_command.stdout }}"
+
+    - name: Save private key to  file
+      copy:
+        dest: "/etc/wg0.key"
+        content: "{{ wg_private_key }}"
+        mode: "0400"
+
+    - name: Generate public key
+      shell: "wg pubkey < /etc/wg0.key"
+      register: wg_public_key_command
+
+    - set_fact:
+        wg_public_key: "{{ wg_public_key_command.stdout }}"
+
+    - name: Install systemd units
+      copy:
+        src: "systemd-{{ item }}.service"
+        dest: "/etc/systemd/system/{{ item }}.service"
+      loop:
+        - "wig-api"
+        - "wig-gateway"
+
+    - name: Configure services
+      copy:
+        dest: "/etc/default/{{ item.service }}"
+        content: "ARGS=\"{{ item.args | join(' ') }}\"\n"
+        mode: "0644"
+      loop:
+        - service: "wig-api"
+          args: ["--db=/tmp/wig.sql"]
+        - service: "wig-gateway"
+          args: ["--iface=wg0", "--private-key=/etc/wg0.key", "--ip={{ gw_ip_cidr }}", "--log-url=http://localhost:5005"]
+        
+    - name: Reload systemd
+      systemd:
+        daemon_reload: true
+
+    - name: Start the systemd services
+      systemd:
+        name: "{{ item }}.service"
+        state: started
+      loop:
+        - "wig-api"
+        - "wig-gateway"
+
+    - name: Find the default gateway interface
+      shell: "ip route show default | awk '{print $5}'"
+      register: default_route_interface_command
+
+    - name: Find the IP address on the default gateway interface
+      shell: "ip route show default | awk '{print $5}' | xargs ip addr show | awk '$1==\"inet\" {print $2}' | cut -d/ -f1"
+      register: default_route_address_command
+
+    - set_fact:
+        default_route_interface: "{{ default_route_interface_command.stdout }}"
+        default_route_address: "{{ default_route_address_command.stdout }}"
+
+    - name: Setup firewall rules
+      command: "{{ item }}"
+      loop:
+        - "sysctl -w net.ipv4.ip_forward=1"
+        - "iptables -P FORWARD ACCEPT"
+        - "iptables -t nat -A POSTROUTING -o {{ default_route_interface }} -j SNAT --to {{ default_route_address }}"
+
+    - name: Debug state of IP addrs
+      command: "ip addr show"
+
+    - name: Debug firewall state
+      command: "iptables -t {{ item }} -S"
+      loop:
+        - filter
+        - nat
+        - mangle
+
+- hosts: gateway
+  gather_facts: false
+  run_once: true
+  tasks:
+    - name: Create peer private key
+      command: "wg genkey"
+      no_log: true
+      register: wg_peer_private_key_command
+
+    - set_fact:
+        wg_peer_private_key: "{{ wg_peer_private_key_command.stdout }}"
+
+    - name: Generate peer public key
+      shell: "echo -n {{ wg_peer_private_key }} | wg pubkey"
+      register: wg_peer_public_key_command
+
+    - set_fact:
+        wg_peer_public_key: "{{ wg_peer_public_key_command.stdout }}"
+
+    - name: Create peer
+      command: "wig create-peer --url http://localhost:5005 --public-key {{ wg_peer_public_key }} --ip {{ peer_ip_cidr }}"
+
+- hosts: client
+  gather_facts: false
+  tasks:
+    - set_fact:
+        wg_public_key: "{{ hostvars[groups['gateway'][0]].wg_public_key }}"
+        wg_peer_private_key: "{{ hostvars[groups['gateway'][0]].wg_peer_private_key }}"
+        wg_gateway_ip: "{{ hostvars[groups['gateway'][0]].test_ip_address }}"
+
+    - name: Install required packages
+      apt:
+        name: "{{ packages }}"
+        state: present
+      vars:
+        packages:
+          - wireguard
+          - netcat-openbsd
+
+    - name: Configure Wireguard connection
+      copy:
+        dest: "/etc/wireguard/wgtest.conf"
+        content: |
+          [Interface]
+          PrivateKey = {{ wg_peer_private_key }}
+          Address = {{ peer_ip }}
+
+          [Peer]
+          PublicKey = {{ wg_public_key }}
+          AllowedIPs = 0.0.0.0/0
+          Endpoint = {{ wg_gateway_ip }}:4004
+
+    - name: Start Wireguard connection
+      command: "wg-quick up wgtest"
+
+    - name: Debug Wireguard status
+      command: "wg show"
+
+    - name: Debug ip addr
+      command: "ip addr show"
+
+    - name: Debug ip route
+      command: "ip route show"
+
+    - name: Ping Wireguard gateway
+      command: "ping -q -c3 {{ gw_ip }}"
+
+    - name: Ping Google
+      command: "ping -q -c3 8.8.8.8"
