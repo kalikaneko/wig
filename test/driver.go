@@ -408,13 +408,12 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	playbookFile, _ := filepath.Abs("setup.yml")
-
 	inventoryFile := filepath.Join(env.Dir, "hosts.ini")
 	if err := createAnsibleInventory(inventoryFile, env, vm); err != nil {
 		return err
 	}
 
+	// Create a controlling Context that can be stopped with a signal.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -424,27 +423,27 @@ func run(ctx context.Context) error {
 		cancel()
 	}()
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
-	defer func() {
-		close(sigCh)
-		signal.Reset(syscall.SIGTERM, syscall.SIGINT)
-	}()
 
 	return withProvider(ctx, vm, func() error {
 		log.Printf("env: %+v", env)
-		log.Printf("running ansible...")
+		for _, playbook := range flag.Args() {
+			playbookAbs, _ := filepath.Abs(playbook)
+			log.Printf("running ansible on %s...", playbook)
 
-		err := runCmd(ctx, env.Dir, "ansible-playbook", "-v", "-i", inventoryFile, playbookFile)
-		if err != nil {
-			if *inspectHost != "" {
-				log.Printf("connecting to %s for manual inspection...", *inspectHost)
-				runCmd(ctx, env.Dir, "ssh", "-F", vm.sshConfig(), *inspectHost)
-			} else {
-				log.Printf("dumping journal from host1...")
-				runCmd(ctx, env.Dir, "ssh", "-F", vm.sshConfig(), "host1",
-					"sudo journalctl -n 200 | grep -v pam_unix | grep -v 'sudo.*vagrant'")
+			err := runCmd(ctx, env.Dir, "ansible-playbook", "-v", "-i", inventoryFile, playbookAbs)
+			if err != nil {
+				if *inspectHost != "" {
+					log.Printf("connecting to %s for manual inspection...", *inspectHost)
+					runCmd(ctx, env.Dir, "ssh", "-F", vm.sshConfig(), *inspectHost)
+				} else {
+					log.Printf("dumping journal from host1...")
+					runCmd(ctx, env.Dir, "ssh", "-F", vm.sshConfig(), "host1",
+						"sudo journalctl -n 200 | grep -v pam_unix | grep -v 'sudo.*vagrant'")
+				}
+				return err
 			}
 		}
-		return err
+		return nil
 	})
 }
 
