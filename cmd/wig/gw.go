@@ -5,6 +5,7 @@ import (
 	"flag"
 
 	"git.autistici.org/ai3/attic/wig/collector"
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
 	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/gateway"
@@ -47,8 +48,9 @@ func (c *gwCommand) run(ctx context.Context) error {
 		return err
 	}
 
-	rlog := crudlog.NewRemoteLogSource(string(c.logURL), model.Model.Encoding(), tlsConf)
-	rstats := collector.NewStatsCollectorStub(string(c.logURL), tlsConf)
+	client := httptransport.NewClient(tlsConf)
+	rlog := crudlog.NewRemoteLogSource(string(c.logURL), model.Model.Encoding(), client)
+	rstats := collector.NewStatsCollectorStub(string(c.logURL), client)
 
 	gw, err := gateway.New(rstats)
 	if err != nil {

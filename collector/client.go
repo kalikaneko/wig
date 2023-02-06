@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	"crypto/tls"
 	"net/http"
 
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
@@ -15,14 +14,10 @@ type statsCollectorStub struct {
 	uri    string
 }
 
-func NewStatsCollectorStub(uri string, tlsConf *tls.Config) gateway.StatsCollector {
+func NewStatsCollectorStub(uri string, client *http.Client) gateway.StatsCollector {
 	return &statsCollectorStub{
-		uri: uri,
-		client: &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: tlsConf,
-			},
-		},
+		uri:    uri,
+		client: client,
 	}
 }
 

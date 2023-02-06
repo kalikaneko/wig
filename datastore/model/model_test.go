@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -237,7 +238,7 @@ func TestModel_SQL_Remote(t *testing.T) {
 	defer srv.Close()
 	defer h.Close()
 
-	src := crudlog.NewRemoteLogSource(srv.URL, Model.Encoding(), nil)
+	src := crudlog.NewRemoteLogSource(srv.URL, Model.Encoding(), new(http.Client))
 
 	runSimplePropagationTest(t, db1, db2, src)
 	sqlDBsInSync(t, dir+"/db1.sql", dir+"/db2.sql")

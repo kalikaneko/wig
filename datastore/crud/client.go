@@ -2,11 +2,9 @@ package crud
 
 import (
 	"context"
-	"crypto/tls"
 	"net/http"
 	"net/url"
 	"reflect"
-	"time"
 
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 )
@@ -18,7 +16,7 @@ type typeClient struct {
 	client *http.Client
 }
 
-func newTypeClient(uri string, tlsConf *tls.Config, t Type, httpc *http.Client) *typeClient {
+func newTypeClient(uri string, t Type, httpc *http.Client) *typeClient {
 	return &typeClient{
 		t:      t,
 		uri:    uri,
@@ -74,21 +72,15 @@ type Client struct {
 	clients  map[string]*typeClient
 }
 
-func (m *Model) Client(uri string, tlsConf *tls.Config) *Client {
+func (m *Model) Client(uri string, httpc *http.Client) *Client {
 	c := &Client{
 		registry: m.registry,
 		clients:  make(map[string]*typeClient),
 	}
-	httpc := &http.Client{
-		Transport: &http.Transport{
-			IdleConnTimeout: 300 * time.Second,
-			TLSClientConfig: tlsConf,
-		},
-	}
 
 	// nolint: errcheck
 	m.registry.each(func(t Type) error {
-		c.clients[t.Name()] = newTypeClient(uri, tlsConf, t, httpc)
+		c.clients[t.Name()] = newTypeClient(uri, t, httpc)
 		return nil
 	})
 	return c

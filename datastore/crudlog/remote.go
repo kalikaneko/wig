@@ -3,14 +3,12 @@ package crudlog
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
-	"time"
 
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"github.com/cenkalti/backoff/v4"
@@ -27,20 +25,15 @@ const (
 	apiURLSubscribe = "/api/v1/log/subscribe"
 )
 
-func NewRemoteLogSource(uri string, encoding Encoding, tlsConf *tls.Config) LogSource {
-	return newRemotePubsubClient(uri, encoding, tlsConf)
+func NewRemoteLogSource(uri string, encoding Encoding, client *http.Client) LogSource {
+	return newRemotePubsubClient(uri, encoding, client)
 }
 
-func newRemotePubsubClient(uri string, encoding Encoding, tlsConf *tls.Config) *remotePubsubClient {
+func newRemotePubsubClient(uri string, encoding Encoding, client *http.Client) *remotePubsubClient {
 	return &remotePubsubClient{
 		uri:      uri,
 		encoding: encoding,
-		client: &http.Client{
-			Transport: &http.Transport{
-				IdleConnTimeout: 300 * time.Second,
-				TLSClientConfig: tlsConf,
-			},
-		},
+		client:   client,
 	}
 }
 

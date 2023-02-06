@@ -77,7 +77,7 @@ func (r *command) client() (API, error) {
 		return nil, err
 	}
 	url := httptransport.JoinURL(r.urlFlag, r.urlPrefix)
-	return r.m.Client(url, tlsConf).Get(r.t.Name()), nil
+	return r.m.Client(url, httptransport.NewClient(tlsConf)).Get(r.t.Name()), nil
 }
 
 type commandWithFlags struct {

@@ -10,6 +10,7 @@ import (
 	"git.autistici.org/ai3/attic/wig/collector"
 	"git.autistici.org/ai3/attic/wig/datastore"
 	"git.autistici.org/ai3/attic/wig/datastore/crud"
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
 	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
@@ -87,7 +88,8 @@ func (c *apiCommand) run(ctx context.Context) error {
 			return err
 		}
 
-		rlog := crudlog.NewRemoteLogSource(logURL, model.Model.Encoding(), tlsConf)
+		rlog := crudlog.NewRemoteLogSource(logURL, model.Model.Encoding(),
+			httptransport.NewClient(tlsConf))
 
 		//db.SetReadonly()
 		g.Go(func() error {
