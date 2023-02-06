@@ -77,7 +77,7 @@ func (t *sqlTableAdapter) Each(tx *sqlx.Tx, f func(interface{}) error) error {
 }
 
 func (t *sqlTableAdapter) Find(tx *sqlx.Tx, query map[string]string, f func(interface{}) error) error {
-	rows, err := tx.Queryx(fmt.Sprintf("SELECT * FROM `%s`", t.table))
+	rows, err := newQueryBuilder(t.table, query).exec(tx)
 	if err != nil {
 		return err
 	}
@@ -124,4 +124,29 @@ func buildUpdateStatement(table, primaryKeyField string, fields []string) string
 
 func buildDeleteStatement(table, primaryKeyField string) string {
 	return fmt.Sprintf("DELETE FROM `%s` WHERE %s=:%s", table, primaryKeyField, primaryKeyField)
+}
+
+type queryBuilder struct {
+	table   string
+	clauses []string
+	args    []interface{}
+}
+
+func newQueryBuilder(table string, query map[string]string) *queryBuilder {
+	q := &queryBuilder{table: table}
+	for k, v := range query {
+		q.clauses = append(q.clauses, fmt.Sprintf("%s = ?", k))
+		q.args = append(q.args, v)
+	}
+	return q
+}
+
+func (q *queryBuilder) exec(tx *sqlx.Tx) (*sqlx.Rows, error) {
+	return tx.Queryx(
+		fmt.Sprintf(
+			"SELECT * FROM `%s` WHERE %s",
+			q.table,
+			strings.Join(q.clauses, " AND "),
+		),
+		q.args...)
 }
