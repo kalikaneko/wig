@@ -3,6 +3,7 @@ package crud
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -189,6 +190,42 @@ func (c *restGetCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...i
 	}))
 }
 
+type restFindCommand struct {
+	*command
+}
+
+func newFindCommand(m *Model, t TypeMeta, url string) *restFindCommand {
+	return &restFindCommand{newRestCommand(m, t, url, "find")}
+}
+
+func (c *restFindCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
+	client, err := c.client()
+	if err != nil {
+		return fatalErr(err)
+	}
+
+	query := make(map[string]string)
+	for _, arg := range f.Args() {
+		parts := strings.SplitN(arg, "=", 1)
+		if len(parts) != 2 {
+			return fatalErr(errors.New("could not parse query as attr=value"))
+		}
+		query[parts[0]] = parts[1]
+	}
+
+	// Type is embedded in the Client so we don't need to specify it.
+	fmt.Printf("[")
+	defer fmt.Printf("]\n")
+	i := 0
+	return fatalErr(client.Find(ctx, "", query, func(obj interface{}) error {
+		if i > 0 {
+			fmt.Printf(", ")
+		}
+		i++
+		return json.NewEncoder(os.Stdout).Encode(obj)
+	}))
+}
+
 func syntaxErr(msg string) subcommands.ExitStatus {
 	log.Printf("invocation error: %s", msg)
 	return subcommands.ExitUsageError
@@ -208,4 +245,5 @@ func RegisterCommands(m *Model, t TypeMeta, url string) {
 	subcommands.Register(newUpdateCommand(m, t, url), section)
 	subcommands.Register(newDeleteCommand(m, t, url), section)
 	subcommands.Register(newGetCommand(m, t, url), section)
+	subcommands.Register(newFindCommand(m, t, url), section)
 }
