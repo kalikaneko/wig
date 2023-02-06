@@ -14,6 +14,9 @@
           Acquire::https::Proxy "http://{{ apt_proxy }}/";
       when: "apt_proxy != ''"
 
+    - name: Fix sources.list
+      shell: "sed -i -e 's,https://,http://,g' -e 's,^deb-src,#deb-src,' /etc/apt/sources.list"
+
     - name: Update packages
       apt:
         update_cache: true
@@ -42,26 +45,6 @@
           - wireguard
           - netcat-openbsd
 
-    - name: Create private key
-      command: "wg genkey"
-      register: wg_private_key_command
-
-    - set_fact:
-        wg_private_key: "{{ wg_private_key_command.stdout }}"
-
-    - name: Save private key to  file
-      copy:
-        dest: "/etc/wg0.key"
-        content: "{{ wg_private_key }}"
-        mode: "0400"
-
-    - name: Generate public key
-      shell: "wg pubkey < /etc/wg0.key"
-      register: wg_public_key_command
-
-    - set_fact:
-        wg_public_key: "{{ wg_public_key_command.stdout }}"
-
     - name: Install systemd units
       copy:
         src: "systemd-{{ item }}.service"
@@ -79,7 +62,7 @@
         - service: "wig-api"
           args: ["--db=/tmp/wig.sql"]
         - service: "wig-gateway"
-          args: ["--iface=wg0", "--private-key=/etc/wg0.key", "--ip={{ gw_ip_cidr }}", "--log-url=http://localhost:5005"]
+          args: ["--log-url=http://localhost:5005"]
         
     - name: Reload systemd
       systemd:
@@ -126,6 +109,20 @@
   gather_facts: false
   run_once: true
   tasks:
+    - name: Create interface private key
+      command: "wg genkey"
+      register: wg_private_key_command
+
+    - set_fact:
+        wg_private_key: "{{ wg_private_key_command.stdout }}"
+
+    - name: Generate interface public key
+      shell: "echo -n {{ wg_private_key }} | wg pubkey"
+      register: wg_public_key_command
+
+    - set_fact:
+        wg_public_key: "{{ wg_public_key_command.stdout }}"
+
     - name: Create peer private key
       command: "wg genkey"
       no_log: true
@@ -141,8 +138,11 @@
     - set_fact:
         wg_peer_public_key: "{{ wg_peer_public_key_command.stdout }}"
 
+    - name: Create interface
+      command: "wig create-interface --url http://localhost:5005 --name wg0 --port 4004 --private-key {{ wg_private_key }} --ip {{ gw_ip_cidr }}"
+
     - name: Create peer
-      command: "wig create-peer --url http://localhost:5005 --public-key {{ wg_peer_public_key }} --ip {{ peer_ip_cidr }}"
+      command: "wig create-peer --url http://localhost:5005 --interface wg0 --public-key {{ wg_peer_public_key }} --ip {{ peer_ip_cidr }}"
 
 - hosts: client
   gather_facts: false

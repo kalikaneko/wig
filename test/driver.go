@@ -301,9 +301,7 @@ func parseGroupSpec(s string) (map[string][]string, error) {
 		if len(tmp) != 2 {
 			return nil, errors.New("invalid group spec")
 		}
-		for _, gh := range strings.Split(tmp[1], ",") {
-			g[tmp[0]] = append(g[tmp[0]], gh)
-		}
+		g[tmp[0]] = append(g[tmp[0]], strings.Split(tmp[1], ",")...)
 	}
 	return g, nil
 }
@@ -333,6 +331,7 @@ func generateHosts(n int, network *net.IPNet) []host {
 func runCmd(dir, cmd string, args ...string) error {
 	c := exec.Command(cmd, args...)
 	c.Dir = dir
+	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()
@@ -340,6 +339,7 @@ func runCmd(dir, cmd string, args ...string) error {
 
 var (
 	keep        = flag.Bool("keep", false, "keep the VMs around after exiting")
+	inspectHost = flag.String("inspect", "", "inspect this `host` manually")
 	testNetwork = flag.String("network", "", "test network")
 	numHosts    = flag.Int("hosts", 2, "number of desired hosts")
 	groupSpec   = flag.String("groups", "gateway=host1;client=host2", "group specs (name=host1,host2;...)")
@@ -415,8 +415,14 @@ func run() error {
 
 		err := runCmd(env.Dir, "ansible-playbook", "-v", "-i", inventoryFile, playbookFile)
 		if err != nil {
-			log.Printf("attempting to dump journal...")
-			runCmd(env.Dir, "ssh", "-F", vm.sshConfig(), "host1", "sudo journalctl -n 200")
+			if *inspectHost != "" {
+				log.Printf("logging to %s for manual inspection...", *inspectHost)
+				runCmd(env.Dir, "ssh", "-F", vm.sshConfig(), *inspectHost)
+			} else {
+				log.Printf("attempting to dump journal...")
+				runCmd(env.Dir, "ssh", "-F", vm.sshConfig(), "host1",
+					"sudo journalctl -n 200 | grep -v pam_unix | grep -v 'sudo.*vagrant'")
+			}
 		}
 		return err
 	})

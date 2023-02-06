@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"git.autistici.org/ai3/attic/wig/datastore"
+	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/datastore/sessiondb"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"git.autistici.org/ai3/attic/wig/gateway"
@@ -35,7 +35,7 @@ type SessionFinder struct {
 	wg      sync.WaitGroup
 
 	mx             sync.Mutex
-	activeSessions map[string]*datastore.Session
+	activeSessions map[string]*model.Session
 	lastHandshake  map[string]time.Time
 }
 
@@ -87,11 +87,11 @@ func (f *SessionFinder) dumper(db *sqlx.DB) {
 	}
 }
 
-func (f *SessionFinder) ActiveSessions() []*datastore.Session {
+func (f *SessionFinder) ActiveSessions() []*model.Session {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
-	out := make([]*datastore.Session, 0, len(f.activeSessions))
+	out := make([]*model.Session, 0, len(f.activeSessions))
 	for _, s := range f.activeSessions {
 		out = append(out, s)
 	}
@@ -106,7 +106,7 @@ func (f *SessionFinder) setHandshakeTime(pkey string, ht time.Time) time.Time {
 	return ht
 }
 
-func (f *SessionFinder) Analyze(now time.Time, s *gateway.PeerStats) *datastore.Session {
+func (f *SessionFinder) Analyze(now time.Time, s *gateway.PeerStats) *model.Session {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
@@ -118,7 +118,7 @@ func (f *SessionFinder) Analyze(now time.Time, s *gateway.PeerStats) *datastore.
 	switch {
 	case !ok && active:
 		// "Up" edge, a new session.
-		cur = &datastore.Session{
+		cur = &model.Session{
 			PeerPublicKey: s.PublicKey,
 			Begin:         ht,
 			Active:        true,

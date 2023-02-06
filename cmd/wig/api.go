@@ -9,7 +9,9 @@ import (
 
 	"git.autistici.org/ai3/attic/wig/collector"
 	"git.autistici.org/ai3/attic/wig/datastore"
-	"git.autistici.org/ai3/attic/wig/datastore/peerdb"
+	"git.autistici.org/ai3/attic/wig/datastore/crud"
+	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
+	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"git.autistici.org/ai3/attic/wig/util"
 	"github.com/google/subcommands"
@@ -60,8 +62,16 @@ func (c *apiCommand) run(ctx context.Context) error {
 	}
 	defer sql.Close()
 
-	db := peerdb.NewSQLDatabase(sql, c.maxLogAge)
-	defer db.Close()
+	logdb := crudlog.Wrap(
+		sql,
+		model.Model,
+		model.Model.Encoding(),
+	)
+	api := crud.Combine(
+		crud.NewSQL(model.Model, sql),
+		logdb,
+	)
+	//defer logdb.Close()
 
 	rec, err := collector.NewStatsReceiver(sql)
 	if err != nil {
@@ -77,11 +87,11 @@ func (c *apiCommand) run(ctx context.Context) error {
 			return err
 		}
 
-		rlog := peerdb.NewRemoteLog(logURL, tlsConf)
+		rlog := crudlog.NewRemoteLogSource(logURL, model.Model.Encoding(), tlsConf)
 
-		db.SetReadonly()
+		//db.SetReadonly()
 		g.Go(func() error {
-			return peerdb.Follow(ctx, rlog, db)
+			return crudlog.Follow(ctx, rlog, logdb)
 		})
 	}
 
@@ -90,9 +100,17 @@ func (c *apiCommand) run(ctx context.Context) error {
 		return err
 	}
 	g.Go(func() error {
-		var h http.Handler
-		h = peerdb.NewLogHTTPHandler(db,
-			peerdb.NewPeerAPIHandler(db, nil))
+		h := model.Model.Handler(
+			api,
+			apiURLBase,
+		)
+		logH := crudlog.NewLogSourceHTTPHandler(
+			logdb,
+			model.Model.Encoding(),
+			h,
+		)
+		defer logH.Close()
+		h = logH
 		if logURL == "" {
 			h = collector.NewHandler(rec, h)
 		}

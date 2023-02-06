@@ -1,4 +1,4 @@
-package peerdb
+package crudlog
 
 import (
 	"container/list"
@@ -17,10 +17,14 @@ func newPubSub() *pubsub {
 	}
 }
 
-func (p *pubsub) addSubscriber(subCh chan Op) *list.Element {
+func (p *pubsub) AddSubscriber(subCh chan Op) func() {
 	p.mx.Lock()
 	defer p.mx.Unlock()
-	return p.subscribers.PushFront(subCh)
+
+	el := p.subscribers.PushFront(subCh)
+	return func() {
+		p.removeSubscriber(el)
+	}
 }
 
 func (p *pubsub) removeSubscriber(el *list.Element) {
@@ -31,7 +35,7 @@ func (p *pubsub) removeSubscriber(el *list.Element) {
 	p.mx.Unlock()
 }
 
-func (p *pubsub) publish(op Op) {
+func (p *pubsub) Emit(op Op) {
 	p.mx.Lock()
 	if len(p.toClose) > 0 {
 		for _, ch := range p.toClose {
@@ -45,29 +49,4 @@ func (p *pubsub) publish(op Op) {
 		ch <- op
 	}
 	p.mx.Unlock()
-}
-
-type subscription struct {
-	preload []Op
-	ch      chan Op
-
-	p  *pubsub
-	el *list.Element
-}
-
-func (s *subscription) Notify() <-chan Op {
-	outCh := make(chan Op, chanBufSize)
-	go func() {
-		for _, op := range s.preload {
-			outCh <- op
-		}
-		for op := range s.ch {
-			outCh <- op
-		}
-	}()
-	return outCh
-}
-
-func (s *subscription) Close() {
-	s.p.removeSubscriber(s.el)
 }

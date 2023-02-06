@@ -5,7 +5,7 @@ import (
 	"net"
 	"os"
 
-	"git.autistici.org/ai3/attic/wig/datastore"
+	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"github.com/oschwald/maxminddb-golang"
 )
 
@@ -38,7 +38,7 @@ func newIPRefiner(paths []string) (*ipRefiner, error) {
 	return &ipr, nil
 }
 
-func (r *ipRefiner) addIPInfo(sess *datastore.Session, ipStr string) {
+func (r *ipRefiner) addIPInfo(sess *model.Session, ipStr string) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return

@@ -1,38 +1,13 @@
-package datastore
+package model
 
 import (
 	"database/sql/driver"
 	"encoding/json"
 	"net"
-	"time"
 )
 
-type Interface struct {
-	Name       string `json:"name"`
-	IP         *CIDR  `json:"ip"`
-	IP6        *CIDR  `json:"ip6"`
-	Fwmark     int    `json:"fwmark"`
-	PrivateKey string `json:"-"`
-	PublicKey  string `json:"public_key"`
-}
-
-type Peer struct {
-	PublicKey string    `json:"public_key" db:"public_key"`
-	IP        *CIDR     `json:"ip" db:"ip"`
-	IP6       *CIDR     `json:"ip6" db:"ip6"`
-	Expire    time.Time `json:"expire" db:"expire"`
-}
-
-type Session struct {
-	PeerPublicKey string    `json:"peer_public_key" db:"peer_public_key"`
-	SrcASNum      string    `json:"src_as_num" db:"src_as_num"`
-	SrcASOrg      string    `json:"src_as_org" db:"src_as_org"`
-	SrcCountry    string    `json:"src_country" db:"src_country"`
-	Begin         time.Time `json:"begin" db:"begin_timestamp"`
-	End           time.Time `json:"end" db:"end_timestamp"`
-	Active        bool      `json:"active" db:"active"`
-}
-
+// CIDR is a net.IPNet augmented with serialization / deserialization
+// methods for database/sql and JSON.
 type CIDR struct {
 	net.IPNet
 }

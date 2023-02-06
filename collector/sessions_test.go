@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"git.autistici.org/ai3/attic/wig/datastore"
+	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"git.autistici.org/ai3/attic/wig/gateway"
 )
@@ -15,8 +16,8 @@ type testData struct {
 	t time.Time
 }
 
-func processStats(t *testing.T, sf *SessionFinder, testData []testData) []*datastore.Session {
-	var out []*datastore.Session
+func processStats(t *testing.T, sf *SessionFinder, testData []testData) []*model.Session {
+	var out []*model.Session
 	for _, td := range testData {
 		sess := sf.Analyze(td.t, &td.PeerStats)
 		if sess != nil {

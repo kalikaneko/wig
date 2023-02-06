@@ -5,11 +5,11 @@ import (
 	"crypto/x509"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 )
 
 func loadCA(path string) (*x509.CertPool, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +95,6 @@ func (c *ServerTLSFlags) TLSServerConfig() (*tls.Config, error) {
 		tlsConf.ClientAuth = tls.RequireAndVerifyClientCert
 		tlsConf.ClientCAs = pool
 	}
-
-	tlsConf.BuildNameToCertificate()
 
 	return tlsConf, nil
 }

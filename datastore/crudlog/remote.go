@@ -1,4 +1,4 @@
-package peerdb
+package crudlog
 
 import (
 	"bufio"
@@ -10,16 +10,16 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
-	"git.autistici.org/ai3/attic/wig/datastore/rest"
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"github.com/cenkalti/backoff/v4"
 )
 
 type remotePubsubClient struct {
-	uri    string
-	client *http.Client
+	uri      string
+	encoding Encoding
+	client   *http.Client
 }
 
 const (
@@ -27,22 +27,14 @@ const (
 	apiURLSubscribe = "/api/v1/log/subscribe"
 )
 
-func joinURL(a, b string) string {
-	out := a
-	if !strings.HasSuffix(a, "/") {
-		out += "/"
-	}
-	out += strings.TrimPrefix(b, "/")
-	return out
+func NewRemoteLogSource(uri string, encoding Encoding, tlsConf *tls.Config) LogSource {
+	return newRemotePubsubClient(uri, encoding, tlsConf)
 }
 
-func NewRemoteLog(uri string, tlsConf *tls.Config) Log {
-	return newRemotePubsubClient(uri, tlsConf)
-}
-
-func newRemotePubsubClient(uri string, tlsConf *tls.Config) *remotePubsubClient {
+func newRemotePubsubClient(uri string, encoding Encoding, tlsConf *tls.Config) *remotePubsubClient {
 	return &remotePubsubClient{
-		uri: uri,
+		uri:      uri,
+		encoding: encoding,
 		client: &http.Client{
 			Transport: &http.Transport{
 				IdleConnTimeout: 300 * time.Second,
@@ -60,31 +52,15 @@ func (r *remotePubsubClient) Snapshot(ctx context.Context) (Snapshot, error) {
 			err = maybeTempError(err)
 			return
 		},
-		backoff.WithContext(rest.RetryPolicy, ctx),
+		backoff.WithContext(httptransport.RetryPolicy, ctx),
 	)
 	return snap, err
 }
 
 func (r *remotePubsubClient) doSnapshot(ctx context.Context) (Snapshot, error) {
-	req, err := http.NewRequest("GET", joinURL(r.uri, apiURLSnapshot), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := r.client.Do(req.WithContext(ctx))
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, rest.UnwrapError(resp)
-	}
-
 	var snap memSnapshot
-	if err := json.NewDecoder(bufio.NewReader(resp.Body)).Decode(&snap); err != nil {
-		return nil, err
-	}
-	return &snap, nil
+	err := httptransport.Do(ctx, r.client, "GET", httptransport.JoinURL(r.uri, apiURLSnapshot), nil, &snap)
+	return &snap, err
 }
 
 func (r *remotePubsubClient) Subscribe(ctx context.Context, start Sequence) (Subscription, error) {
@@ -95,13 +71,13 @@ func (r *remotePubsubClient) Subscribe(ctx context.Context, start Sequence) (Sub
 			err = maybeTempError(err)
 			return
 		},
-		backoff.WithContext(rest.RetryPolicy, ctx),
+		backoff.WithContext(httptransport.RetryPolicy, ctx),
 	)
 	return sub, err
 }
 
 func (r *remotePubsubClient) doSubscribe(ctx context.Context, start Sequence) (Subscription, error) {
-	uri := joinURL(r.uri, apiURLSubscribe) + "?start=" + start.String()
+	uri := httptransport.JoinURL(r.uri, apiURLSubscribe) + "?start=" + start.String()
 	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		return nil, err
@@ -113,22 +89,24 @@ func (r *remotePubsubClient) doSubscribe(ctx context.Context, start Sequence) (S
 	}
 	if resp.StatusCode != 200 {
 		defer resp.Body.Close()
-		return nil, rest.UnwrapError(resp)
+		return nil, httptransport.UnwrapError(resp)
 	}
-	return newRemoteSubscription(ctx, resp), nil
+	return newRemoteSubscription(ctx, r.encoding, resp), nil
 }
 
 type remoteSubscription struct {
-	ctx     context.Context
-	resp    *http.Response
-	scanner *bufio.Scanner
+	ctx      context.Context
+	resp     *http.Response
+	scanner  *bufio.Scanner
+	encoding Encoding
 }
 
-func newRemoteSubscription(ctx context.Context, resp *http.Response) *remoteSubscription {
+func newRemoteSubscription(ctx context.Context, encoding Encoding, resp *http.Response) *remoteSubscription {
 	return &remoteSubscription{
-		ctx:     ctx,
-		resp:    resp,
-		scanner: bufio.NewScanner(resp.Body),
+		ctx:      ctx,
+		resp:     resp,
+		encoding: encoding,
+		scanner:  bufio.NewScanner(resp.Body),
 	}
 }
 
@@ -149,12 +127,12 @@ func (s *remoteSubscription) loop(ch chan Op) {
 				// encoding.
 				continue
 			}
-			var op Op
-			if err := json.Unmarshal(b, &op); err != nil {
-				log.Printf("error unmarshaling op: %v", err)
+			op := new(op).WithEncoding(s.encoding)
+			if err := json.Unmarshal(b, op); err != nil {
+				log.Printf("error unmarshaling op: %v: %s", err, b)
 				return
 			}
-			ch <- op
+			ch <- op.Op()
 		}
 	}()
 
@@ -177,32 +155,38 @@ func (s *remoteSubscription) Close() {
 	s.resp.Body.Close()
 }
 
-type LogHTTPHandler struct {
-	Log
-
-	wrap http.Handler
-	done chan struct{}
+type HandlerCloser interface {
+	http.Handler
+	Close()
 }
 
-func NewLogHTTPHandler(l Log, h http.Handler) *LogHTTPHandler {
-	return &LogHTTPHandler{
-		Log:  l,
-		wrap: h,
-		done: make(chan struct{}),
+type logSourceHTTPHandler struct {
+	src      LogSource
+	encoding Encoding
+	wrap     http.Handler
+	done     chan struct{}
+}
+
+func NewLogSourceHTTPHandler(src LogSource, encoding Encoding, h http.Handler) HandlerCloser {
+	return &logSourceHTTPHandler{
+		src:      src,
+		encoding: encoding,
+		wrap:     h,
+		done:     make(chan struct{}),
 	}
 }
 
-func (s *LogHTTPHandler) Close() {
+func (s *logSourceHTTPHandler) Close() {
 	close(s.done)
 }
 
-func (s *LogHTTPHandler) handleSnapshot(w http.ResponseWriter, req *http.Request) {
+func (s *logSourceHTTPHandler) handleSnapshot(w http.ResponseWriter, req *http.Request) {
 	log.Printf("HTTPServer: Snapshot()")
 
-	snap, err := s.Log.Snapshot(req.Context())
+	snap, err := s.src.Snapshot(req.Context())
 	if err != nil {
 		log.Printf("Snapshot() error: %v", err)
-		rest.HTTPError(w, err)
+		httptransport.HTTPError(w, err)
 		return
 	}
 
@@ -216,7 +200,7 @@ func (s *LogHTTPHandler) handleSnapshot(w http.ResponseWriter, req *http.Request
 	bw.Flush()
 }
 
-func (s *LogHTTPHandler) handleSubscribe(w http.ResponseWriter, req *http.Request) {
+func (s *logSourceHTTPHandler) handleSubscribe(w http.ResponseWriter, req *http.Request) {
 	// Parse the 'start' parameter.
 	start, err := ParseSequence(req.FormValue("start"))
 	if err != nil {
@@ -226,10 +210,10 @@ func (s *LogHTTPHandler) handleSubscribe(w http.ResponseWriter, req *http.Reques
 
 	log.Printf("HTTPServer: Subscribe(%s)", start)
 
-	sub, err := s.Log.Subscribe(req.Context(), start)
+	sub, err := s.src.Subscribe(req.Context(), start)
 	if err != nil {
 		log.Printf("Subscribe() error: %v", err)
-		rest.HTTPError(w, err)
+		httptransport.HTTPError(w, err)
 		return
 	}
 	defer sub.Close()
@@ -246,7 +230,7 @@ func (s *LogHTTPHandler) handleSubscribe(w http.ResponseWriter, req *http.Reques
 	for {
 		select {
 		case op := <-ch:
-			if err := json.NewEncoder(w).Encode(&op); err != nil {
+			if err := json.NewEncoder(w).Encode(op.WithEncoding(s.encoding)); err != nil {
 				log.Printf("Subscribe() write error: %v", err)
 				return
 			}
@@ -261,7 +245,7 @@ func (s *LogHTTPHandler) handleSubscribe(w http.ResponseWriter, req *http.Reques
 	}
 }
 
-func (s *LogHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (s *logSourceHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch req.URL.Path {
 	case apiURLSnapshot:
 		s.handleSnapshot(w, req)
@@ -277,9 +261,9 @@ func (s *LogHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func init() {
-	rest.RegisterError("horizon", ErrHorizon)
-	rest.RegisterError("out-of-sequence", ErrOutOfSequence)
-	rest.RegisterError("readonly", ErrReadOnly)
+	httptransport.RegisterError("horizon", ErrHorizon)
+	httptransport.RegisterError("out-of-sequence", ErrOutOfSequence)
+	//httptransport.RegisterError("readonly", ErrReadOnly)
 }
 
 func maybeTempError(err error) error {

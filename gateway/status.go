@@ -21,8 +21,8 @@ type PeerStats struct {
 
 type StatsDump []PeerStats
 
-func (n *Gateway) collectStats() (StatsDump, error) {
-	dev, err := n.ctrl.Device(n.intf.Name)
+func (i *wgInterface) collectStats() (StatsDump, error) {
+	dev, err := i.ctrl.Device(i.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -43,10 +43,18 @@ func (n *Gateway) collectStats() (StatsDump, error) {
 }
 
 func (n *Gateway) updateStats(ctx context.Context) error {
-	stats, err := n.collectStats()
-	if err != nil {
-		return err
+	n.mx.Lock()
+	defer n.mx.Unlock()
+
+	var stats StatsDump
+	for _, intf := range n.intfs {
+		istats, err := intf.collectStats()
+		if err != nil {
+			return err
+		}
+		stats = append(stats, istats...)
 	}
+
 	return n.stats.ReceivePeerStats(ctx, stats)
 }
 

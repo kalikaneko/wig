@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"git.autistici.org/ai3/attic/wig/datastore"
+	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"github.com/jmoiron/sqlx"
 )
@@ -13,7 +13,7 @@ type sessionTx struct {
 	tx *sqlx.Tx
 }
 
-func (s *sessionTx) DumpActiveSessions(sessions []*datastore.Session) error {
+func (s *sessionTx) DumpActiveSessions(sessions []*model.Session) error {
 	_, err := s.tx.Exec("DELETE FROM active_sessions")
 	if err != nil {
 		return err
@@ -23,7 +23,7 @@ func (s *sessionTx) DumpActiveSessions(sessions []*datastore.Session) error {
 	return err
 }
 
-func (s *sessionTx) GetActiveSessions() map[string]*datastore.Session {
+func (s *sessionTx) GetActiveSessions() map[string]*model.Session {
 	rows, err := s.tx.Queryx("SELECT * FROM active_sessions")
 	if err != nil {
 		log.Printf("oops: %v", err)
@@ -31,9 +31,9 @@ func (s *sessionTx) GetActiveSessions() map[string]*datastore.Session {
 	}
 	defer rows.Close()
 
-	out := make(map[string]*datastore.Session)
+	out := make(map[string]*model.Session)
 	for rows.Next() {
-		var sess datastore.Session
+		var sess model.Session
 		if err := rows.StructScan(&sess); err != nil {
 			log.Printf("oops: %v", err)
 			break
@@ -65,21 +65,21 @@ func (s *sessionTx) GetLastHandshakeTimes() map[string]time.Time {
 	return out
 }
 
-func (s *sessionTx) WriteCompletedSession(sess *datastore.Session) error {
+func (s *sessionTx) WriteCompletedSession(sess *model.Session) error {
 	_, err := s.tx.NamedExec("INSERT INTO sessions (peer_public_key, begin_timestamp, end_timestamp, src_as_num, src_as_org, src_country) VALUES (:peer_public_key, :begin_timestamp, :end_timestamp, :src_as_num, :src_as_org, :src_country)", sess)
 	return err
 }
 
-func (s *sessionTx) FindSessionsByPublicKey(pk string, limit int) []*datastore.Session {
+func (s *sessionTx) FindSessionsByPublicKey(pk string, limit int) []*model.Session {
 	rows, err := s.tx.Queryx("SELECT * FROM sessions WHERE peer_public_key = ? ORDER BY begin_timestamp DESC LIMIT ?", pk, limit)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
 
-	var out []*datastore.Session
+	var out []*model.Session
 	for rows.Next() {
-		var sess datastore.Session
+		var sess model.Session
 		if err := rows.StructScan(&sess); err != nil {
 			continue
 		}
@@ -92,12 +92,12 @@ func (s *sessionTx) Tx() *sqlx.Tx { return s.tx }
 type Tx interface {
 	Tx() *sqlx.Tx
 
-	GetActiveSessions() map[string]*datastore.Session
+	GetActiveSessions() map[string]*model.Session
 	GetLastHandshakeTimes() map[string]time.Time
-	DumpActiveSessions([]*datastore.Session) error
+	DumpActiveSessions([]*model.Session) error
 
-	WriteCompletedSession(*datastore.Session) error
-	FindSessionsByPublicKey(string, int) []*datastore.Session
+	WriteCompletedSession(*model.Session) error
+	FindSessionsByPublicKey(string, int) []*model.Session
 }
 
 func newTx(tx *sqlx.Tx) Tx {

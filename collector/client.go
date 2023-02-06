@@ -1,13 +1,11 @@
 package collector
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/json"
-	"fmt"
 	"net/http"
 
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"git.autistici.org/ai3/attic/wig/gateway"
 )
 
@@ -28,21 +26,5 @@ func NewStatsCollectorStub(uri string, tlsConf *tls.Config) gateway.StatsCollect
 }
 
 func (c *statsCollectorStub) ReceivePeerStats(ctx context.Context, stats gateway.StatsDump) error {
-	payload, err := json.Marshal(stats)
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequest("POST", c.uri+apiURLReceive, bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	resp, err := c.client.Do(req.WithContext(ctx))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("HTTP status %d", resp.StatusCode)
-	}
-	return nil
+	return httptransport.Do(ctx, c.client, "POST", c.uri+apiURLReceive, stats, nil)
 }

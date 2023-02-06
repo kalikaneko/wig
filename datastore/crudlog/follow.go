@@ -1,4 +1,4 @@
-package peerdb
+package crudlog
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"log"
 )
 
-func Follow(ctx context.Context, src Log, dst LogReceiver) error {
+func Follow(ctx context.Context, src LogSource, dst LogSink) error {
 	start := dst.LatestSequence()
 
 	// Start a subscription with the snapshot as a reference.
@@ -15,7 +15,7 @@ func Follow(ctx context.Context, src Log, dst LogReceiver) error {
 
 retry:
 	log.Printf("follow starts from local sequence %s", start)
-	sub, err := src.Subscribe(ctx, start)
+	sub, err := src.Subscribe(ctx, start+1)
 	if errors.Is(err, ErrHorizon) && restartFromSnapshot {
 		// Can't recover from 'start', grab a snapshot.
 		log.Printf("index %s is past the remote horizon, grabbing snapshot", start)
@@ -42,8 +42,11 @@ retry:
 	for {
 		select {
 		case op := <-ch:
-			if err := dst.Apply(op); err != nil {
-				return fmt.Errorf("sequence %s: %w", op.Seq, err)
+			if op == nil {
+				return nil
+			}
+			if err := dst.Apply(op, true); err != nil {
+				return fmt.Errorf("sequence %s: %w", op.Seq(), err)
 			}
 		case <-ctx.Done():
 			return ctx.Err()

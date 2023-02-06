@@ -2,11 +2,10 @@ package collector
 
 import (
 	"context"
-	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"git.autistici.org/ai3/attic/wig/datastore/sessiondb"
 	"git.autistici.org/ai3/attic/wig/gateway"
 	"github.com/jmoiron/sqlx"
@@ -33,8 +32,8 @@ func NewStatsReceiver(db *sqlx.DB) (*StatsReceiver, error) {
 func (r *StatsReceiver) ReceivePeerStats(_ context.Context, dump gateway.StatsDump) error {
 	now := time.Now()
 	return sessiondb.WithTx(r.db, func(tx sessiondb.Tx) error {
-		for _, s := range dump {
-			sess := r.sf.Analyze(now, &s)
+		for i := 0; i < len(dump); i++ {
+			sess := r.sf.Analyze(now, &dump[i])
 			if sess != nil {
 				if err := tx.WriteCompletedSession(sess); err != nil {
 					return err
@@ -59,18 +58,9 @@ func NewHandler(r *StatsReceiver, h http.Handler) http.Handler {
 
 func (r *receiverHandler) handleReceive(w http.ResponseWriter, req *http.Request) {
 	var dump gateway.StatsDump
-	if err := json.NewDecoder(req.Body).Decode(&dump); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if err := r.rec.ReceivePeerStats(req.Context(), dump); err != nil {
-		log.Printf("StatsReceiver error: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(200)
+	httptransport.ServeJSON(w, req, &dump, func() (interface{}, error) {
+		return nil, r.rec.ReceivePeerStats(req.Context(), dump)
+	})
 }
 
 func (r *receiverHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {

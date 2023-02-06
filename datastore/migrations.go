@@ -7,15 +7,23 @@ var Migrations = []sqlite.Migration{
 CREATE TABLE log (
   seq INTEGER PRIMARY KEY NOT NULL,
   type INTEGER NOT NULL,
-  peer_public_key SMALLTEXT,
-  peer_ip TEXT,
-  peer_ip6 TEXT,
-  peer_expire DATETIME,
+  value TEXT,
   timestamp DATETIME
+);
+`, `
+CREATE TABLE interfaces (
+  name SMALLTEXT PRIMARY KEY NOT NULL,
+  port INTEGER,
+  ip TEXT,
+  ip6 TEXT,
+  fwmark INTEGER,
+  private_key TEXT,
+  public_key TEXT
 );
 `, `
 CREATE TABLE peers (
   public_key SMALLTEXT PRIMARY KEY NOT NULL,
+  interface SMALLTEXT NOT NULL,
   ip TEXT,
   ip6 TEXT,
   expire DATETIME
@@ -29,7 +37,7 @@ CREATE TABLE sequence (
   seq INTEGER
 );
 `, `
-INSERT INTO sequence (seq) VALUES (1);
+INSERT INTO sequence (seq) VALUES (0);
 `, `
 CREATE TABLE active_sessions (
   peer_public_key SMALLTEXT,
