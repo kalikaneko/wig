@@ -98,6 +98,12 @@ func (f *SessionFinder) ActiveSessions() []*model.Session {
 	return out
 }
 
+func (f *SessionFinder) ActiveSessionByPublicKey(pkey string) *model.Session {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+	return f.activeSessions[pkey]
+}
+
 func (f *SessionFinder) setHandshakeTime(pkey string, ht time.Time) time.Time {
 	if last, ok := f.lastHandshake[pkey]; ok && ht.Before(last) {
 		return last
