@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -12,8 +13,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"text/template"
 	"time"
 )
@@ -76,12 +79,13 @@ type vmprovider interface {
 	sshConfig() string
 	ansibleSSHParams() []string
 
-	start() error
-	stop()
+	start(context.Context) error
+	stop(context.Context)
 }
 
-func withProvider(vm vmprovider, f func() error) error {
-	err := vm.start()
+func withProvider(ctx context.Context, vm vmprovider, f func() error) error {
+	log.Printf("bringing up VM environment...")
+	err := vm.start(ctx)
 	if err != nil {
 		return err
 	}
@@ -90,7 +94,9 @@ func withProvider(vm vmprovider, f func() error) error {
 	if *keep {
 		log.Printf("keeping VMs around for manual inspection...")
 	} else {
-		vm.stop()
+		// Use a fresh context for stop(), the original one might be completed already.
+		log.Printf("stopping VM environment...")
+		vm.stop(context.Background())
 	}
 	return err
 }
@@ -111,16 +117,16 @@ func (v *vagrant) ansibleSSHParams() []string {
 	}
 }
 
-func (v *vagrant) start() error {
-	runCmd(v.env.Dir, "vagrant", "destroy", "-f")
-	if err := runCmd(v.env.Dir, "vagrant", "up"); err != nil {
+func (v *vagrant) start(ctx context.Context) error {
+	runCmd(ctx, v.env.Dir, "vagrant", "destroy", "-f")
+	if err := runCmd(ctx, v.env.Dir, "vagrant", "up"); err != nil {
 		return err
 	}
-	return runCmd(v.env.Dir, "sh", "-c", "vagrant ssh-config > ssh-config")
+	return runCmd(ctx, v.env.Dir, "sh", "-c", "vagrant ssh-config > ssh-config")
 }
 
-func (v *vagrant) stop() {
-	runCmd(v.env.Dir, "vagrant", "destroy", "-f")
+func (v *vagrant) stop(ctx context.Context) {
+	runCmd(ctx, v.env.Dir, "vagrant", "destroy", "-f")
 }
 
 func newVagrant(env *env) (*vagrant, error) {
@@ -198,7 +204,7 @@ func newVmine(uri string, env *env) (*vmine, error) {
 func genSSHKey(dir string) (string, error) {
 	keyPath := filepath.Join(dir, "id_ed25519")
 
-	if err := runCmd("", "ssh-keygen", "-t", "ed25519", "-f", keyPath, "-N", "", "-C", "", "-q"); err != nil {
+	if err := runCmd(context.Background(), "", "ssh-keygen", "-t", "ed25519", "-f", keyPath, "-N", "", "-C", "", "-q"); err != nil {
 		return "", err
 	}
 
@@ -209,7 +215,7 @@ func genSSHKey(dir string) (string, error) {
 	return strings.TrimSpace(string(data)), nil
 }
 
-func (v *vmine) jsonRequest(path string, reqObj, respObj interface{}) error {
+func (v *vmine) jsonRequest(ctx context.Context, path string, reqObj, respObj interface{}) error {
 	payload, err := json.Marshal(reqObj)
 	if err != nil {
 		return err
@@ -221,7 +227,7 @@ func (v *vmine) jsonRequest(path string, reqObj, respObj interface{}) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := v.client.Do(req)
+	resp, err := v.client.Do(req.WithContext(ctx))
 	if err != nil {
 		return err
 	}
@@ -250,8 +256,8 @@ func hostsToVmine(hosts []host) []vmineHost {
 	return out
 }
 
-func (v *vmine) start() error {
-	return v.jsonRequest("/api/create-group", &vmineCreateGroupRequest{
+func (v *vmine) start(ctx context.Context) error {
+	return v.jsonRequest(ctx, "/api/create-group", &vmineCreateGroupRequest{
 		NetworkCIDR: v.env.Network.String(),
 		TTL:         float64(600 * time.Minute),
 		SSHKey:      v.sshKey,
@@ -259,8 +265,8 @@ func (v *vmine) start() error {
 	}, &v.data)
 }
 
-func (v *vmine) stop() {
-	if err := v.jsonRequest("/api/delete-group", &v.data, nil); err != nil {
+func (v *vmine) stop(ctx context.Context) {
+	if err := v.jsonRequest(ctx, "/api/delete-group", &v.data, nil); err != nil {
 		log.Printf("vmine: error stopping VM group: %v", err)
 	}
 }
@@ -328,8 +334,8 @@ func generateHosts(n int, network *net.IPNet) []host {
 	return hosts
 }
 
-func runCmd(dir, cmd string, args ...string) error {
-	c := exec.Command(cmd, args...)
+func runCmd(ctx context.Context, dir, cmd string, args ...string) error {
+	c := exec.CommandContext(ctx, cmd, args...)
 	c.Dir = dir
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
@@ -381,7 +387,7 @@ func (e *env) Close() {
 	}
 }
 
-func run() error {
+func run(ctx context.Context) error {
 	env, err := createEnv()
 	if err != nil {
 		return err
@@ -409,18 +415,32 @@ func run() error {
 		return err
 	}
 
-	return withProvider(vm, func() error {
-		log.Printf("env: %+v", env)
-		log.Printf("running ansible now")
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-		err := runCmd(env.Dir, "ansible-playbook", "-v", "-i", inventoryFile, playbookFile)
+	sigCh := make(chan os.Signal, 1)
+	go func() {
+		<-sigCh
+		cancel()
+	}()
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	defer func() {
+		close(sigCh)
+		signal.Reset(syscall.SIGTERM, syscall.SIGINT)
+	}()
+
+	return withProvider(ctx, vm, func() error {
+		log.Printf("env: %+v", env)
+		log.Printf("running ansible...")
+
+		err := runCmd(ctx, env.Dir, "ansible-playbook", "-v", "-i", inventoryFile, playbookFile)
 		if err != nil {
 			if *inspectHost != "" {
-				log.Printf("logging to %s for manual inspection...", *inspectHost)
-				runCmd(env.Dir, "ssh", "-F", vm.sshConfig(), *inspectHost)
+				log.Printf("connecting to %s for manual inspection...", *inspectHost)
+				runCmd(ctx, env.Dir, "ssh", "-F", vm.sshConfig(), *inspectHost)
 			} else {
-				log.Printf("attempting to dump journal...")
-				runCmd(env.Dir, "ssh", "-F", vm.sshConfig(), "host1",
+				log.Printf("dumping journal from host1...")
+				runCmd(ctx, env.Dir, "ssh", "-F", vm.sshConfig(), "host1",
 					"sudo journalctl -n 200 | grep -v pam_unix | grep -v 'sudo.*vagrant'")
 			}
 		}
@@ -433,7 +453,7 @@ func main() {
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 
-	if err := run(); err != nil {
+	if err := run(context.Background()); err != nil {
 		log.Fatal(err)
 	}
 }
