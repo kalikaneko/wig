@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 )
 
@@ -85,13 +86,13 @@ func (h *typeHandler) handleFind(w http.ResponseWriter, req *http.Request) {
 	io.WriteString(w, "]") // nolint: errcheck
 }
 
-func (m *Model) Handler(api API, urlPrefix string) http.Handler {
-	mux := http.NewServeMux()
-	// nolint: errcheck
-	m.registry.each(func(t Type) error {
-		pfx := httptransport.JoinURL(urlPrefix, t.Name()) + "/"
-		mux.Handle(pfx, newTypeHTTPHandler(t, api, pfx))
-		return nil
+func (m *Model) API(api API, urlPrefix string) httpapi.Builder {
+	return httpapi.BuilderFunc(func(hapi *httpapi.API) {
+		// nolint: errcheck
+		m.registry.each(func(t Type) error {
+			pfx := httptransport.JoinURL(urlPrefix, t.Name()) + "/"
+			hapi.Handle(pfx, newTypeHTTPHandler(t, api, pfx))
+			return nil
+		})
 	})
-	return mux
 }

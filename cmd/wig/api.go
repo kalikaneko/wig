@@ -10,6 +10,7 @@ import (
 	"git.autistici.org/ai3/attic/wig/collector"
 	"git.autistici.org/ai3/attic/wig/datastore"
 	"git.autistici.org/ai3/attic/wig/datastore/crud"
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
 	"git.autistici.org/ai3/attic/wig/datastore/model"
@@ -74,7 +75,7 @@ func (c *apiCommand) run(ctx context.Context) error {
 	)
 	//defer logdb.Close()
 
-	rec, err := collector.NewStatsReceiver(sql)
+	stats, err := collector.NewStatsReceiver(sql)
 	if err != nil {
 		return err
 	}
@@ -102,23 +103,23 @@ func (c *apiCommand) run(ctx context.Context) error {
 		return err
 	}
 	g.Go(func() error {
-		h := model.Model.Handler(
+		httpAPI := httpapi.New()
+		httpAPI.Add(model.Model.API(
 			api,
 			apiURLBase,
-		)
+		))
 		logH := crudlog.NewLogSourceHTTPHandler(
 			logdb,
 			model.Model.Encoding(),
-			h,
 		)
 		defer logH.Close()
-		h = logH
+		httpAPI.Add(logH)
 		if logURL == "" {
-			h = collector.NewHandler(rec, h)
+			httpAPI.Add(stats)
 		}
 		server := &http.Server{
 			Addr:              c.addr,
-			Handler:           h,
+			Handler:           httpAPI,
 			ReadHeaderTimeout: 10 * time.Second,
 			IdleTimeout:       900 * time.Second,
 			TLSConfig:         tlsConf,

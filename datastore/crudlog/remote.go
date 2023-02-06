@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"github.com/cenkalti/backoff/v4"
 )
@@ -148,23 +149,21 @@ func (s *remoteSubscription) Close() {
 	s.resp.Body.Close()
 }
 
-type HandlerCloser interface {
-	http.Handler
+type BuilderCloser interface {
+	httpapi.Builder
 	Close()
 }
 
 type logSourceHTTPHandler struct {
 	src      LogSource
 	encoding Encoding
-	wrap     http.Handler
 	done     chan struct{}
 }
 
-func NewLogSourceHTTPHandler(src LogSource, encoding Encoding, h http.Handler) HandlerCloser {
+func NewLogSourceHTTPHandler(src LogSource, encoding Encoding) BuilderCloser {
 	return &logSourceHTTPHandler{
 		src:      src,
 		encoding: encoding,
-		wrap:     h,
 		done:     make(chan struct{}),
 	}
 }
@@ -238,19 +237,9 @@ func (s *logSourceHTTPHandler) handleSubscribe(w http.ResponseWriter, req *http.
 	}
 }
 
-func (s *logSourceHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	switch req.URL.Path {
-	case apiURLSnapshot:
-		s.handleSnapshot(w, req)
-	case apiURLSubscribe:
-		s.handleSubscribe(w, req)
-	default:
-		if s.wrap != nil {
-			s.wrap.ServeHTTP(w, req)
-			return
-		}
-		http.NotFound(w, req)
-	}
+func (s *logSourceHTTPHandler) BuildAPI(api *httpapi.API) {
+	api.Handle(apiURLSnapshot, http.HandlerFunc(s.handleSnapshot))
+	api.Handle(apiURLSubscribe, http.HandlerFunc(s.handleSubscribe))
 }
 
 func init() {
