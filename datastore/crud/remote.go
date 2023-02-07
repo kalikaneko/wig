@@ -15,19 +15,29 @@ type typeHandler struct {
 	api API
 }
 
-func newTypeHTTPHandler(t Type, api API, urlPrefix string) http.Handler {
+func newTypeHTTPHandler(t Type, api API, urlPrefix string, hapi *httpapi.API) http.Handler {
 	h := &typeHandler{
 		t:   t,
 		api: api,
 	}
 
 	mux := http.NewServeMux()
-	log.Printf("installing HTTP handler at %s",
-		httptransport.JoinURL(urlPrefix, "{create|update|delete|find}"))
-	mux.HandleFunc(httptransport.JoinURL(urlPrefix, "create"), h.handleCreate)
-	mux.HandleFunc(httptransport.JoinURL(urlPrefix, "update"), h.handleUpdate)
-	mux.HandleFunc(httptransport.JoinURL(urlPrefix, "delete"), h.handleDelete)
-	mux.HandleFunc(httptransport.JoinURL(urlPrefix, "find"), h.handleFind)
+
+	for _, endpoint := range []struct {
+		verb, rbacTarget string
+		h                func(http.ResponseWriter, *http.Request)
+	}{
+		{"create", "write-" + t.Name(), h.handleCreate},
+		{"update", "write-" + t.Name(), h.handleUpdate},
+		{"delete", "write-" + t.Name(), h.handleDelete},
+		{"find", "read-" + t.Name(), h.handleFind},
+	} {
+		mux.Handle(
+			httptransport.JoinURL(urlPrefix, endpoint.verb),
+			hapi.WithAuth(endpoint.rbacTarget,
+				http.HandlerFunc(endpoint.h)))
+	}
+
 	return mux
 }
 
@@ -91,7 +101,7 @@ func (m *Model) API(api API, urlPrefix string) httpapi.Builder {
 		// nolint: errcheck
 		m.registry.each(func(t Type) error {
 			pfx := httptransport.JoinURL(urlPrefix, t.Name()) + "/"
-			hapi.Handle(pfx, newTypeHTTPHandler(t, api, pfx))
+			hapi.Handle(pfx, newTypeHTTPHandler(t, api, pfx, hapi))
 			return nil
 		})
 	})

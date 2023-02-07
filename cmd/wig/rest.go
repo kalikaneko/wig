@@ -18,4 +18,9 @@ func init() {
 		model.InterfaceType,
 		apiURLBase,
 	)
+	crud.RegisterCommands(
+		model.Model,
+		model.TokenType,
+		apiURLBase,
+	)
 }

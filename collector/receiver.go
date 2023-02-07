@@ -84,6 +84,8 @@ func (r *StatsReceiver) handleGetSessions(w http.ResponseWriter, req *http.Reque
 }
 
 func (r *StatsReceiver) BuildAPI(api *httpapi.API) {
-	api.Handle(apiURLGetSessions, http.HandlerFunc(r.handleGetSessions))
-	api.Handle(apiURLReceive, http.HandlerFunc(r.handleReceive))
+	api.Handle(apiURLGetSessions, api.WithAuth(
+		"read-sessions", http.HandlerFunc(r.handleGetSessions)))
+	api.Handle(apiURLReceive, api.WithAuth(
+		"write-sessions", http.HandlerFunc(r.handleReceive)))
 }

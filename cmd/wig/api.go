@@ -20,6 +20,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var rbacRules = map[string][]string{
+	"admin": []string{
+		"write-peer", "read-peer",
+		"write-interface", "read-interface",
+		"write-token", "read-token",
+		"write-sessions", "read-sessions",
+	},
+	"gateway": []string{
+		"read-log",
+	},
+}
+
 type apiCommand struct {
 	util.ClientTLSFlags
 	util.ServerTLSFlags
@@ -103,7 +115,10 @@ func (c *apiCommand) run(ctx context.Context) error {
 		return err
 	}
 	g.Go(func() error {
-		httpAPI := httpapi.New()
+		httpAPI := httpapi.New(
+			httpapi.NewBearerTokenAuthn(sql),
+			httpapi.NewRBAC(rbacRules),
+		)
 		httpAPI.Add(model.Model.API(
 			api,
 			apiURLBase,

@@ -8,4 +8,5 @@ func init() {
 	Model = crud.New()
 	Model.Register(PeerType)
 	Model.Register(InterfaceType)
+	Model.Register(TokenType)
 }

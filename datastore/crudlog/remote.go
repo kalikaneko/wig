@@ -238,8 +238,10 @@ func (s *logSourceHTTPHandler) handleSubscribe(w http.ResponseWriter, req *http.
 }
 
 func (s *logSourceHTTPHandler) BuildAPI(api *httpapi.API) {
-	api.Handle(apiURLSnapshot, http.HandlerFunc(s.handleSnapshot))
-	api.Handle(apiURLSubscribe, http.HandlerFunc(s.handleSubscribe))
+	api.Handle(apiURLSnapshot, api.WithAuth(
+		"read-log", http.HandlerFunc(s.handleSnapshot)))
+	api.Handle(apiURLSubscribe, api.WithAuth(
+		"read-log", http.HandlerFunc(s.handleSubscribe)))
 }
 
 func init() {

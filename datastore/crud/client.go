@@ -51,7 +51,8 @@ func (c *typeClient) Find(ctx context.Context, _ string, query map[string]string
 	}
 
 	// Use reflect to build a list of model.NewInstance() types.
-	l := reflect.MakeSlice(reflect.TypeOf(c.t.NewInstance()), 0, 4).Elem()
+	l := reflect.MakeSlice(
+		reflect.SliceOf(reflect.TypeOf(c.t.NewInstance())), 0, 4)
 
 	if err := httptransport.Do(ctx, c.client, "GET", c.verbURL("find")+"?"+values.Encode(), nil, &l); err != nil {
 		return err

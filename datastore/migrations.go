@@ -58,5 +58,11 @@ CREATE TABLE sessions (
 );
 `, `
 CREATE INDEX idx_sessions_peer ON sessions(peer_public_key);
+`, `
+CREATE TABLE tokens (
+  id TEXT PRIMARY KEY NOT NULL,
+  secret TEXT NOT NULL,
+  roles TEXT
+)
 `),
 }

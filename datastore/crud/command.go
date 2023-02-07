@@ -72,6 +72,9 @@ func (r *command) SetFlags(f *flag.FlagSet) {
 }
 
 func (r *command) client() (API, error) {
+	if r.urlFlag == "" {
+		return nil, errors.New("must specify --url")
+	}
 	tlsConf, err := r.TLSClientConfig()
 	if err != nil {
 		return nil, err
@@ -214,16 +217,20 @@ func (c *restFindCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...
 	}
 
 	// Type is embedded in the Client so we don't need to specify it.
-	fmt.Printf("[")
-	defer fmt.Printf("]\n")
 	i := 0
-	return fatalErr(client.Find(ctx, "", query, func(obj interface{}) error {
-		if i > 0 {
+	if err := client.Find(ctx, "", query, func(obj interface{}) error {
+		if i == 0 {
+			fmt.Printf("[")
+		} else {
 			fmt.Printf(", ")
 		}
 		i++
 		return json.NewEncoder(os.Stdout).Encode(obj)
-	}))
+	}); err != nil {
+		return fatalErr(err)
+	}
+	fmt.Printf("]\n")
+	return subcommands.ExitSuccess
 }
 
 func syntaxErr(msg string) subcommands.ExitStatus {
