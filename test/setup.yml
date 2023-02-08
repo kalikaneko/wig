@@ -16,6 +16,7 @@
 
     - name: Fix sources.list
       shell: "sed -i -e 's,https://,http://,g' -e 's,^deb-src,#deb-src,' /etc/apt/sources.list"
+      warn: false
 
     - name: Update packages
       apt:

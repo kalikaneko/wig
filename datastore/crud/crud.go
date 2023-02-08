@@ -6,11 +6,15 @@ import (
 	"log"
 	"reflect"
 
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"github.com/jmoiron/sqlx"
 )
 
-var ErrUnknownType = errors.New("unknown type")
+var (
+	ErrUnknownType = errors.New("unknown type")
+	ErrReadonly    = errors.New("read-only")
+)
 
 // Writer is the write part of a generic CRUD client interface.
 type Writer interface {
@@ -42,6 +46,14 @@ type splitAPI struct {
 func Combine(r Reader, w Writer) API {
 	return &splitAPI{Reader: r, Writer: w}
 }
+
+type roWriter struct{}
+
+func (roWriter) Create(_ context.Context, _ interface{}) error { return ErrReadonly }
+func (roWriter) Update(_ context.Context, _ interface{}) error { return ErrReadonly }
+func (roWriter) Delete(_ context.Context, _ interface{}) error { return ErrReadonly }
+
+func ReadOnlyWriter() Writer { return new(roWriter) }
 
 // TypeMeta is the descriptor interface for a data type (returns static metadata).
 type TypeMeta interface {
@@ -202,4 +214,9 @@ func (s *SQLReader) Find(_ context.Context, typ string, query map[string]string,
 	return sqlite.WithTx(s.db, func(tx *sqlx.Tx) (err error) {
 		return t.Find(tx, query, f)
 	})
+}
+
+func init() {
+	httptransport.RegisterError("unknown-type", ErrUnknownType)
+	httptransport.RegisterError("readonly", ErrReadonly)
 }

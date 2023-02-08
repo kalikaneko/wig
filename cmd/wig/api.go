@@ -111,11 +111,15 @@ func (c *apiCommand) run(ctx context.Context) error {
 		model.Model,
 		model.Model.Encoding(),
 	)
-	api := crud.Combine(
-		crud.NewSQL(model.Model, sql),
-		logdb,
-	)
-	//defer logdb.Close()
+
+	// If we're a follower, switch the API to read-only.
+	var w crud.Writer
+	if c.logURL != "" {
+		w = crud.ReadOnlyWriter()
+	} else {
+		w = logdb
+	}
+	api := crud.Combine(crud.NewSQL(model.Model, sql), w)
 
 	stats, err := collector.NewStatsReceiver(sql)
 	if err != nil {
@@ -124,6 +128,7 @@ func (c *apiCommand) run(ctx context.Context) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 
+	// Start the follower.
 	if c.logURL != "" {
 		client, err := c.HTTPClient()
 		if err != nil {
@@ -138,15 +143,16 @@ func (c *apiCommand) run(ctx context.Context) error {
 		})
 	}
 
-	tlsConf, err := c.TLSServerConfig()
-	if err != nil {
-		return err
-	}
-	httpAPI, err := c.api(sql)
-	if err != nil {
-		return err
-	}
+	// Start the HTTP server.
 	g.Go(func() error {
+		tlsConf, err := c.TLSServerConfig()
+		if err != nil {
+			return err
+		}
+		httpAPI, err := c.api(sql)
+		if err != nil {
+			return err
+		}
 		httpAPI.Add(model.Model.API(
 			api,
 			apiURLBase,
