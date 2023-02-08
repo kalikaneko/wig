@@ -266,7 +266,7 @@ func (v *vmine) start(ctx context.Context) error {
 }
 
 func (v *vmine) stop(ctx context.Context) {
-	if err := v.jsonRequest(ctx, "/api/delete-group", &v.data, nil); err != nil {
+	if err := v.jsonRequest(ctx, "/api/stop-group", &v.data, nil); err != nil {
 		log.Printf("vmine: error stopping VM group: %v", err)
 	}
 }
