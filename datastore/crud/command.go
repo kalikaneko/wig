@@ -31,7 +31,7 @@ func (v Values) Get(k string) string {
 }
 
 type command struct {
-	util.ClientTLSFlags
+	util.ClientCommand
 
 	m    *Model
 	t    TypeMeta
@@ -68,19 +68,19 @@ func (r *command) Usage() string {
 
 func (r *command) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.urlFlag, "url", "", "API server `URL`")
-	r.ClientTLSFlags.SetFlags(f)
+	r.ClientCommand.SetFlags(f)
 }
 
 func (r *command) client() (API, error) {
 	if r.urlFlag == "" {
 		return nil, errors.New("must specify --url")
 	}
-	tlsConf, err := r.TLSClientConfig()
+	client, err := r.HTTPClient()
 	if err != nil {
 		return nil, err
 	}
 	url := httptransport.JoinURL(r.urlFlag, r.urlPrefix)
-	return r.m.Client(url, httptransport.NewClient(tlsConf)).Get(r.t.Name()), nil
+	return r.m.Client(url, client).Get(r.t.Name()), nil
 }
 
 type commandWithFlags struct {

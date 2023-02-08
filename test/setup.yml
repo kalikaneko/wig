@@ -53,6 +53,14 @@
         - "wig-api"
         - "wig-gateway"
 
+    - name: Initialize the database
+      command: "wig init --db=/tmp/wig.sql"
+      register: wig_init_command
+
+    - set_fact:
+        admin_auth_token: "{{ (wig_init_command.stdout | from_json).id }}"
+        admin_auth_secret: "{{ (wig_init_command.stdout | from_json).secret }}"
+
     - name: Configure services
       copy:
         dest: "/etc/default/{{ item.service }}"
@@ -62,8 +70,8 @@
         - service: "wig-api"
           args: ["--db=/tmp/wig.sql"]
         - service: "wig-gateway"
-          args: ["--log-url=http://localhost:5005"]
-        
+          args: ["--auth-token={{ admin_auth_token }}", "--auth-secret={{ admin_auth_secret }}", "--log-url=http://localhost:5005"]
+
     - name: Reload systemd
       systemd:
         daemon_reload: true
@@ -94,16 +102,6 @@
         - "sysctl -w net.ipv4.ip_forward=1"
         - "iptables -P FORWARD ACCEPT"
         - "iptables -t nat -A POSTROUTING -o {{ default_route_interface }} -j SNAT --to {{ default_route_address }}"
-
-    - name: Debug state of IP addrs
-      command: "ip addr show"
-
-    - name: Debug firewall state
-      command: "iptables -t {{ item }} -S"
-      loop:
-        - filter
-        - nat
-        - mangle
 
 - hosts: gateway
   gather_facts: false
@@ -139,10 +137,10 @@
         wg_peer_public_key: "{{ wg_peer_public_key_command.stdout }}"
 
     - name: Create interface
-      command: "wig create-interface --url http://localhost:5005 --name wg0 --port 4004 --private-key {{ wg_private_key }} --ip {{ gw_ip_cidr }}"
+      command: "wig create-interface --url http://localhost:5005 --auth-token {{ admin_auth_token }} --auth-secret {{ admin_auth_secret }} --name wg0 --port 4004 --private-key {{ wg_private_key }} --ip {{ gw_ip_cidr }}"
 
     - name: Create peer
-      command: "wig create-peer --url http://localhost:5005 --interface wg0 --public-key {{ wg_peer_public_key }} --ip {{ peer_ip_cidr }}"
+      command: "wig create-peer --url http://localhost:5005 --auth-token {{ admin_auth_token }} --auth-secret {{ admin_auth_secret }} --interface wg0 --public-key {{ wg_peer_public_key }} --ip {{ peer_ip_cidr }}"
 
 - hosts: client
   gather_facts: false

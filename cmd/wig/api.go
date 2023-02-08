@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
 	"net/http"
@@ -11,12 +12,12 @@ import (
 	"git.autistici.org/ai3/attic/wig/datastore"
 	"git.autistici.org/ai3/attic/wig/datastore/crud"
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
-	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
 	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"git.autistici.org/ai3/attic/wig/util"
 	"github.com/google/subcommands"
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -26,6 +27,7 @@ var rbacRules = map[string][]string{
 		"write-interface", "read-interface",
 		"write-token", "read-token",
 		"write-sessions", "read-sessions",
+		"read-log",
 	},
 	"gateway": []string{
 		"read-log",
@@ -33,13 +35,15 @@ var rbacRules = map[string][]string{
 }
 
 type apiCommand struct {
-	util.ClientTLSFlags
 	util.ServerTLSFlags
+	util.ClientCommand
 
-	addr      string
-	dburi     string
-	maxLogAge time.Duration
-	logURL    urlFlag
+	addr            string
+	dburi           string
+	maxLogAge       time.Duration
+	logURL          urlFlag
+	authType        string
+	authTLSRoleSpec string
 }
 
 func (c *apiCommand) Name() string     { return "api" }
@@ -56,9 +60,11 @@ func (c *apiCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&c.dburi, "db", "", "`path` to the database file")
 	f.DurationVar(&c.maxLogAge, "max-log-age", 120*24*time.Hour, "maximum age of log entries")
 	f.Var(&c.logURL, "log-url", "`URL` for pull replication")
+	f.StringVar(&c.authType, "auth", "bearer", "authentication mechanism (bearer/mtls/none)")
+	f.StringVar(&c.authTLSRoleSpec, "tls-roles", "", "TLS roles (cn=role1,role2;cn=...)")
 
 	c.ServerTLSFlags.SetFlags(f)
-	c.ClientTLSFlags.SetFlags(f)
+	c.ClientCommand.SetFlags(f)
 }
 
 func (c *apiCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
@@ -67,6 +73,30 @@ func (c *apiCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...inter
 	}
 
 	return fatalErr(c.run(ctx))
+}
+
+func (c *apiCommand) api(sql *sqlx.DB) (*httpapi.API, error) {
+	authz := httpapi.NewRBAC(rbacRules)
+	switch c.authType {
+	case "none":
+		return httpapi.New(httpapi.NilAuthn(), httpapi.NilAuthz()), nil
+	case "bearer":
+		return httpapi.New(
+			httpapi.NewBearerTokenAuthn(sql),
+			authz,
+		), nil
+	case "mtls", "tls":
+		if c.authTLSRoleSpec == "" {
+			return nil, errors.New("must specify --tls-roles")
+		}
+		authn, err := httpapi.NewTLSAuthn(c.authTLSRoleSpec)
+		if err != nil {
+			return nil, err
+		}
+		return httpapi.New(authn, authz), nil
+	default:
+		return nil, errors.New("unknown authentication type")
+	}
 }
 
 func (c *apiCommand) run(ctx context.Context) error {
@@ -96,13 +126,12 @@ func (c *apiCommand) run(ctx context.Context) error {
 
 	logURL := string(c.logURL)
 	if logURL != "" {
-		tlsConf, err := c.TLSClientConfig()
+		client, err := c.HTTPClient()
 		if err != nil {
 			return err
 		}
 
-		rlog := crudlog.NewRemoteLogSource(logURL, model.Model.Encoding(),
-			httptransport.NewClient(tlsConf))
+		rlog := crudlog.NewRemoteLogSource(logURL, model.Model.Encoding(), client)
 
 		//db.SetReadonly()
 		g.Go(func() error {
@@ -114,11 +143,11 @@ func (c *apiCommand) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	httpAPI, err := c.api(sql)
+	if err != nil {
+		return err
+	}
 	g.Go(func() error {
-		httpAPI := httpapi.New(
-			httpapi.NewBearerTokenAuthn(sql),
-			httpapi.NewRBAC(rbacRules),
-		)
 		httpAPI.Add(model.Model.API(
 			api,
 			apiURLBase,

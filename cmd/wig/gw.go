@@ -5,7 +5,6 @@ import (
 	"flag"
 
 	"git.autistici.org/ai3/attic/wig/collector"
-	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
 	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/gateway"
@@ -14,7 +13,7 @@ import (
 )
 
 type gwCommand struct {
-	util.ClientTLSFlags
+	util.ClientCommand
 
 	logURL urlFlag
 }
@@ -31,7 +30,7 @@ func (c *gwCommand) Usage() string {
 func (c *gwCommand) SetFlags(f *flag.FlagSet) {
 	f.Var(&c.logURL, "log-url", "`URL` for the log API")
 
-	c.ClientTLSFlags.SetFlags(f)
+	c.ClientCommand.SetFlags(f)
 }
 
 func (c *gwCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
@@ -43,12 +42,11 @@ func (c *gwCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...interf
 }
 
 func (c *gwCommand) run(ctx context.Context) error {
-	tlsConf, err := c.TLSClientConfig()
+	client, err := c.HTTPClient()
 	if err != nil {
 		return err
 	}
 
-	client := httptransport.NewClient(tlsConf)
 	rlog := crudlog.NewRemoteLogSource(string(c.logURL), model.Model.Encoding(), client)
 	rstats := collector.NewStatsCollectorStub(string(c.logURL), client)
 

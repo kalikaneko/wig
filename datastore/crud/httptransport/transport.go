@@ -3,24 +3,11 @@ package httptransport
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
-
-// NewClient creates a http.Client with sensible parameters and an
-// optional tls.Config.
-func NewClient(tlsConf *tls.Config) *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			IdleConnTimeout: 300 * time.Second,
-			TLSClientConfig: tlsConf,
-		},
-	}
-}
 
 // ServeJSON handles a JSON request, calling 'f' and encoding its response.
 // The caller must provide storage for the JSON request object if necessary.

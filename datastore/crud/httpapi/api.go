@@ -56,3 +56,57 @@ func (a *API) WithAuth(target string, h http.Handler) http.Handler {
 func (a *API) Handle(path string, h http.Handler) {
 	a.ServeMux.Handle(path, h)
 }
+
+type Credentials interface {
+	Identity() string
+	Roles() []string
+}
+
+type Authn interface {
+	CredentialsFromRequest(*http.Request) (Credentials, error)
+}
+
+type Authz interface {
+	HasPermission(Credentials, string) bool
+}
+
+type rbac struct {
+	rules map[string][]string
+}
+
+func NewRBAC(permissions map[string][]string) Authz {
+	return &rbac{rules: permissions}
+}
+
+func (a *rbac) targetsForRole(role string) []string {
+	return a.rules[role]
+}
+
+func (a *rbac) HasPermission(creds Credentials, target string) bool {
+	for _, role := range creds.Roles() {
+		for _, t := range a.targetsForRole(role) {
+			if t == target {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+type nilAuthz struct{}
+
+func (_ nilAuthz) HasPermission(_ Credentials, _ string) bool { return true }
+
+func NilAuthz() Authz {
+	return new(nilAuthz)
+}
+
+type nilAuthn struct{}
+
+func (_ nilAuthn) CredentialsFromRequest(_ *http.Request) (Credentials, error) {
+	return nil, nil
+}
+
+func NilAuthn() Authn {
+	return new(nilAuthn)
+}

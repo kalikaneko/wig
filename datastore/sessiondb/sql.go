@@ -19,7 +19,9 @@ func (s *sessionTx) DumpActiveSessions(sessions []*model.Session) error {
 		return err
 	}
 
-	_, err = s.tx.NamedExec("INSERT INTO active_sessions (peer_public_key, begin_timestamp, end_timestamp, src_as_num, src_as_org, src_country, active) VALUES (:peer_public_key, :begin_timestamp, :end_timestamp, :src_as_num, :src_as_org, :src_country, :active)", sessions)
+	if len(sessions) > 0 {
+		_, err = s.tx.NamedExec("INSERT INTO active_sessions (peer_public_key, begin_timestamp, end_timestamp, src_as_num, src_as_org, src_country, active) VALUES (:peer_public_key, :begin_timestamp, :end_timestamp, :src_as_num, :src_as_org, :src_country, :active)", sessions)
+	}
 	return err
 }
 
