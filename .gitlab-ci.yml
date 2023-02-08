@@ -14,6 +14,7 @@ test_vagrant:
     - apt-get -q update
     - env DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends install ansible build-essential golang openssh-client
     - go build ./cmd/wig
+    - mkdir -p $HOME/.ssh
     - echo "${SSH_PRIVATE_KEY}" > $HOME/.ssh/id_rsa
     - ssh -nN -L 4949:localhost:4949 ${LIBVIRT}
     - cd test && go run driver.go --provider=vmine:http://localhost:4949 setup.yml
