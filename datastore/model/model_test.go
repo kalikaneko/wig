@@ -15,6 +15,7 @@ import (
 
 	"git.autistici.org/ai3/attic/wig/datastore"
 	"git.autistici.org/ai3/attic/wig/datastore/crud"
+	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"github.com/google/go-cmp/cmp"
@@ -233,10 +234,13 @@ func TestModel_SQL_Remote(t *testing.T) {
 		Model.Encoding(),
 	)
 
-	h := crudlog.NewLogSourceHTTPHandler(db1, Model.Encoding(), nil)
-	srv := httptest.NewServer(h)
+	//api1 := crud.Combine(nil, db1)
+	logH := crudlog.NewLogSourceHTTPHandler(db1, Model.Encoding())
+	httpAPI := httpapi.New(httpapi.NilAuthn(), httpapi.NilAuthz())
+	httpAPI.Add(logH)
+	srv := httptest.NewServer(httpAPI)
 	defer srv.Close()
-	defer h.Close()
+	defer logH.Close()
 
 	src := crudlog.NewRemoteLogSource(srv.URL, Model.Encoding(), new(http.Client))
 
