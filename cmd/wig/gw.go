@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"net/http"
 
 	"git.autistici.org/ai3/attic/wig/collector"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
@@ -10,12 +11,16 @@ import (
 	"git.autistici.org/ai3/attic/wig/gateway"
 	"git.autistici.org/ai3/attic/wig/util"
 	"github.com/google/subcommands"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/errgroup"
 )
 
 type gwCommand struct {
 	util.ClientCommand
 
-	logURL string
+	logURL   string
+	httpAddr string
 }
 
 func (c *gwCommand) Name() string     { return "gw" }
@@ -29,6 +34,7 @@ func (c *gwCommand) Usage() string {
 
 func (c *gwCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&c.logURL, "log-url", "", "`URL` for the log API")
+	f.StringVar(&c.httpAddr, "metrics-addr", ":4007", "listen address for the metrics HTTP server")
 
 	c.ClientCommand.SetFlags(f)
 }
@@ -47,6 +53,8 @@ func (c *gwCommand) run(ctx context.Context) error {
 		return err
 	}
 
+	g, ctx := errgroup.WithContext(ctx)
+
 	rlog := crudlog.NewRemoteLogSource(c.logURL, model.Model.Encoding(), client)
 	rstats := collector.NewStatsCollectorStub(c.logURL, client)
 
@@ -56,11 +64,19 @@ func (c *gwCommand) run(ctx context.Context) error {
 	}
 	defer gw.Close()
 
-	if err := crudlog.Follow(ctx, rlog, gw); err != nil {
-		return err
-	}
+	prometheus.MustRegister(gw)
 
-	return nil
+	g.Go(func() error {
+		return crudlog.Follow(ctx, rlog, gw)
+	})
+
+	g.Go(func() error {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		return http.ListenAndServe(c.httpAddr, mux)
+	})
+
+	return g.Wait()
 }
 
 func init() {
