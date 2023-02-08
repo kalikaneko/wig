@@ -9,7 +9,7 @@ test_go:
 
 test_vagrant:
   stage: test
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:bullseye-slim
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:bookworm-slim
   script:
     - apt-get -q update
     - env DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends install ansible golang openssh-client
