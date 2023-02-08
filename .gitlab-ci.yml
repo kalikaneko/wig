@@ -12,7 +12,7 @@ test_vagrant:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:bookworm-slim
   script:
     - apt-get -q update
-    - env DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends install ansible golang openssh-client
+    - env DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends install ansible build-essential golang openssh-client
     - go build ./cmd/wig
     - echo "${SSH_PRIVATE_KEY}" > $HOME/.ssh/id_rsa
     - ssh -nN -L 4949:localhost:4949 ${LIBVIRT}
