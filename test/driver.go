@@ -113,7 +113,7 @@ func (v *vagrant) ansibleSSHParams() []string {
 	return []string{
 		"ansible_user=vagrant",
 		"ansible_become=true",
-		fmt.Sprintf("ansible_ssh_extra_args=\"-F %s\"", v.sshConfig()),
+		fmt.Sprintf("ansible_ssh_extra_args=\"-F %s %s\"", v.sshConfig(), *extraSSHArgs),
 	}
 }
 
@@ -279,7 +279,7 @@ func (v *vmine) ansibleSSHParams() []string {
 	return []string{
 		"ansible_user=root",
 		"ansible_become=false",
-		fmt.Sprintf("ansible_ssh_extra_args=\"-F %s\"", v.sshConfig()),
+		fmt.Sprintf("ansible_ssh_extra_args=\"-F %s %s\"", v.sshConfig(), *extraSSHArgs),
 	}
 }
 
@@ -344,12 +344,13 @@ func runCmd(ctx context.Context, dir, cmd string, args ...string) error {
 }
 
 var (
-	keep        = flag.Bool("keep", false, "keep the VMs around after exiting")
-	inspectHost = flag.String("inspect", "", "inspect this `host` manually")
-	testNetwork = flag.String("network", "", "test network")
-	numHosts    = flag.Int("hosts", 2, "number of desired hosts")
-	groupSpec   = flag.String("groups", "gateway=host1;client=host2", "group specs (name=host1,host2;...)")
-	provider    = flag.String("provider", "vagrant", "choose vm provider (vagrant/vmine:URL)")
+	keep         = flag.Bool("keep", false, "keep the VMs around after exiting")
+	inspectHost  = flag.String("inspect", "", "inspect this `host` manually")
+	testNetwork  = flag.String("network", "", "test network")
+	numHosts     = flag.Int("hosts", 2, "number of desired hosts")
+	groupSpec    = flag.String("groups", "gateway=host1;client=host2", "group specs (name=host1,host2;...)")
+	provider     = flag.String("provider", "vagrant", "choose vm provider (vagrant/vmine:URL)")
+	extraSSHArgs = flag.String("ssh-args", "", "additional ssh args for connecting to hosts")
 )
 
 func createEnv() (*env, error) {
@@ -398,6 +399,8 @@ func run(ctx context.Context) error {
 	switch {
 	case *provider == "vagrant":
 		vm, err = newVagrant(env)
+	case *provider == "vmine":
+		vm, err = newVmine("http://localhost:4949", env)
 	case strings.HasPrefix(*provider, "vmine:"):
 		uri := (*provider)[6:]
 		vm, err = newVmine(uri, env)

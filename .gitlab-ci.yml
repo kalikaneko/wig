@@ -19,5 +19,5 @@ test_vagrant:
     - echo "${SSH_PRIVATE_KEY}" > $HOME/.ssh/id_rsa
     - chmod 0600 $HOME/.ssh/id_rsa
     - ssh -o StrictHostKeyChecking=no -nN -L 4949:localhost:4949 ${LIBVIRT} &
-    - cd test && go run driver.go --provider=vmine:http://localhost:4949 setup.yml
+    - cd test && go run driver.go --provider=vmine --ssh-args="-o ProxyJump=${LIBVIRT}" setup.yml
 
