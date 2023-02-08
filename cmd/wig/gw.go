@@ -15,7 +15,7 @@ import (
 type gwCommand struct {
 	util.ClientCommand
 
-	logURL urlFlag
+	logURL string
 }
 
 func (c *gwCommand) Name() string     { return "gw" }
@@ -28,7 +28,7 @@ func (c *gwCommand) Usage() string {
 }
 
 func (c *gwCommand) SetFlags(f *flag.FlagSet) {
-	f.Var(&c.logURL, "log-url", "`URL` for the log API")
+	f.StringVar(&c.logURL, "log-url", "", "`URL` for the log API")
 
 	c.ClientCommand.SetFlags(f)
 }
@@ -47,8 +47,8 @@ func (c *gwCommand) run(ctx context.Context) error {
 		return err
 	}
 
-	rlog := crudlog.NewRemoteLogSource(string(c.logURL), model.Model.Encoding(), client)
-	rstats := collector.NewStatsCollectorStub(string(c.logURL), client)
+	rlog := crudlog.NewRemoteLogSource(c.logURL, model.Model.Encoding(), client)
+	rstats := collector.NewStatsCollectorStub(c.logURL, client)
 
 	gw, err := gateway.New(rstats)
 	if err != nil {

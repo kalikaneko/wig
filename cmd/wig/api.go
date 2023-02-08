@@ -41,7 +41,7 @@ type apiCommand struct {
 	addr            string
 	dburi           string
 	maxLogAge       time.Duration
-	logURL          urlFlag
+	logURL          string
 	authType        string
 	authTLSRoleSpec string
 }
@@ -59,7 +59,7 @@ func (c *apiCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&c.addr, "addr", ":5005", "`address` to listen on")
 	f.StringVar(&c.dburi, "db", "", "`path` to the database file")
 	f.DurationVar(&c.maxLogAge, "max-log-age", 120*24*time.Hour, "maximum age of log entries")
-	f.Var(&c.logURL, "log-url", "`URL` for pull replication")
+	f.StringVar(&c.logURL, "log-url", "", "`URL` for pull replication")
 	f.StringVar(&c.authType, "auth", "bearer", "authentication mechanism (bearer/mtls/none)")
 	f.StringVar(&c.authTLSRoleSpec, "tls-roles", "", "TLS roles (cn=role1,role2;cn=...)")
 
@@ -124,14 +124,13 @@ func (c *apiCommand) run(ctx context.Context) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	logURL := string(c.logURL)
-	if logURL != "" {
+	if c.logURL != "" {
 		client, err := c.HTTPClient()
 		if err != nil {
 			return err
 		}
 
-		rlog := crudlog.NewRemoteLogSource(logURL, model.Model.Encoding(), client)
+		rlog := crudlog.NewRemoteLogSource(c.logURL, model.Model.Encoding(), client)
 
 		//db.SetReadonly()
 		g.Go(func() error {
@@ -158,7 +157,7 @@ func (c *apiCommand) run(ctx context.Context) error {
 		)
 		defer logH.Close()
 		httpAPI.Add(logH)
-		if logURL == "" {
+		if c.logURL == "" {
 			httpAPI.Add(stats)
 		}
 		server := &http.Server{
