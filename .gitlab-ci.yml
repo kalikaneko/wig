@@ -14,7 +14,7 @@ test_vagrant:
   script:
     - apt-get -q update
     - env DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends install ansible build-essential golang openssh-client
-    - go build ./cmd/wig
+    - go build -ldflags="-extldflags=-static" -tags "sqlite_omit_load_extension netgo" ./cmd/wig
     - mkdir -p $HOME/.ssh
     - echo "${SSH_PRIVATE_KEY}" > $HOME/.ssh/id_rsa
     - chmod 0600 $HOME/.ssh/id_rsa
