@@ -24,6 +24,7 @@ var TokenType = crud.NewSQLTableType(
 	func(values crud.Values) (interface{}, error) {
 		var token Token
 
+		token.ID = values.Get("id")
 		token.Secret = values.Get("secret")
 		token.Roles = strings.Split(values.Get("roles"), ",")
 		return &token, nil
