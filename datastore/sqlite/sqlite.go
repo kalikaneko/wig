@@ -14,7 +14,7 @@ func OpenDB(dburi string, migrations []Migration) (*sqlx.DB, error) {
 	// Add sqlite3-specific parameters if none are already
 	// specified in the connection URI.
 	if !strings.Contains(dburi, "?") {
-		dburi += "?cache=shared&_busy_timeout=10000&_journal=WAL"
+		dburi += "?cache=shared&_busy_timeout=10000&_foreign_keys=on&_journal=WAL"
 	}
 
 	db, err := sqlx.Open("sqlite3", dburi)

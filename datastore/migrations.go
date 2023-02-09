@@ -26,7 +26,10 @@ CREATE TABLE peers (
   interface SMALLTEXT NOT NULL,
   ip TEXT,
   ip6 TEXT,
-  expire DATETIME
+  expire DATETIME,
+  CONSTRAINT fk_interfaces
+    FOREIGN KEY (interface) REFERENCES interfaces(name)
+    ON DELETE CASCADE
 );
 `, `
 CREATE INDEX idx_peers_ip ON peers(ip);
