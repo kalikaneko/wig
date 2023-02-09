@@ -19,8 +19,9 @@ import (
 type gwCommand struct {
 	util.ClientCommand
 
-	logURL   string
-	httpAddr string
+	logURL    string
+	statusURL string
+	httpAddr  string
 }
 
 func (c *gwCommand) Name() string     { return "gw" }
@@ -34,6 +35,7 @@ func (c *gwCommand) Usage() string {
 
 func (c *gwCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&c.logURL, "log-url", "", "`URL` for the log API")
+	f.StringVar(&c.statusURL, "status-url", "", "`URL` for the status API (defaults to --log-url)")
 	f.StringVar(&c.httpAddr, "metrics-addr", ":4007", "listen address for the metrics HTTP server")
 
 	c.ClientCommand.SetFlags(f)
@@ -42,6 +44,9 @@ func (c *gwCommand) SetFlags(f *flag.FlagSet) {
 func (c *gwCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
 	if c.logURL == "" {
 		return syntaxErr("must specify --log-url")
+	}
+	if c.statusURL == "" {
+		c.statusURL = c.logURL
 	}
 
 	return fatalErr(c.run(ctx))
@@ -56,7 +61,7 @@ func (c *gwCommand) run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	rlog := crudlog.NewRemoteLogSource(c.logURL, model.Model.Encoding(), client)
-	rstats := collector.NewStatsCollectorStub(c.logURL, client)
+	rstats := collector.NewStatsCollectorStub(c.statusURL, client)
 
 	gw, err := gateway.New(rstats)
 	if err != nil {

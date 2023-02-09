@@ -97,8 +97,8 @@ Wireguard does not have a concept of "connection", this is done by
 looking for time intervals when the peer is inactive.
 
 Session logs do not store PII such as the peer's IP address, but they
-can be optionally augmented with some broad location data (country,
-ASN) in order to provide meaningful access logs to users.
+can be optionally augmented with broad location data (country, ASN) in
+order to provide meaningful access logs to users.
 
 This data also allows one to detect abandoned peer definitions that
 have not been used in a long time.
