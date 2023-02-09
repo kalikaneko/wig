@@ -54,6 +54,24 @@ Host {{$h.Name}}
 {{end}}
 `
 	vmineSSHConfigTpl = template.Must(template.New("").Parse(vmineSSHConfigTplSrc))
+
+	ansibleInventoryTplSrc = `
+{{range $h := .Env.Hosts}}[{{$h.Name}}]
+{{$h.Name}} test_ip_address={{$h.IP}}
+{{end}}
+
+{{range $group, $hosts := .Env.Groups}}[{{$group}}:children]
+{{range $h := $hosts}}{{$h}}
+{{end}}
+{{end}}
+
+[all:vars]
+{{.AnsibleVMVars}}
+ansible_ssh_args="-F {{.SSHConfig}} -o ControlPath={{.SSHControlPath}} {{.SSHExtraArgs}}"
+ansible_ssh_pipelining=true
+
+`
+	ansibleInventoryTpl = template.Must(template.New("").Parse(ansibleInventoryTplSrc))
 )
 
 type env struct {
@@ -77,7 +95,7 @@ type host struct {
 
 type vmprovider interface {
 	sshConfig() string
-	ansibleSSHParams() []string
+	ansibleVars() []string
 
 	start(context.Context) error
 	stop(context.Context)
@@ -109,11 +127,10 @@ func (v *vagrant) sshConfig() string {
 	return filepath.Join(v.env.Dir, "ssh-config")
 }
 
-func (v *vagrant) ansibleSSHParams() []string {
+func (v *vagrant) ansibleVars() []string {
 	return []string{
 		"ansible_user=vagrant",
 		"ansible_become=true",
-		fmt.Sprintf("ansible_ssh_extra_args=\"-F %s %s\"", v.sshConfig(), *extraSSHArgs),
 	}
 }
 
@@ -275,11 +292,10 @@ func (v *vmine) sshConfig() string {
 	return filepath.Join(v.env.Dir, "ssh-config")
 }
 
-func (v *vmine) ansibleSSHParams() []string {
+func (v *vmine) ansibleVars() []string {
 	return []string{
 		"ansible_user=root",
 		"ansible_become=false",
-		fmt.Sprintf("ansible_ssh_extra_args=\"-F %s %s\"", v.sshConfig(), *extraSSHArgs),
 	}
 }
 
@@ -290,21 +306,13 @@ func createAnsibleInventory(path string, env *env, vm vmprovider) error {
 	}
 	defer f.Close()
 
-	for _, host := range env.Hosts {
-		fmt.Fprintf(f, "[%s]\n%s test_ip_address=%s\n\n", host.Name, host.Name, host.IP)
-	}
-	for group, groupHosts := range env.Groups {
-		fmt.Fprintf(f, "[%s:children]\n%s\n\n", group, strings.Join(groupHosts, "\n"))
-	}
-	// Use a different random SSH ControlPath for fast iteration,
-	// to avoid Ansible getting stuck trying to talk to old hosts.
-	fmt.Fprintf(
-		f,
-		"[all:vars]\n%s\nansible_control_path=%%(directory)s/%s\n\n",
-		strings.Join(vm.ansibleSSHParams(), "\n"),
-		randomSmallString(),
-	)
-	return nil
+	return ansibleInventoryTpl.Execute(f, map[string]interface{}{
+		"Env":            env,
+		"AnsibleVMVars":  strings.Join(vm.ansibleVars(), "\n"),
+		"SSHConfig":      vm.sshConfig(),
+		"SSHControlPath": filepath.Join(env.Dir, randomSmallString()),
+		"SSHExtraArgs":   *extraSSHArgs,
+	})
 }
 
 func parseGroupSpec(s string) (map[string][]string, error) {

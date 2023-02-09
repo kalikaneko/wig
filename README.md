@@ -59,6 +59,11 @@ host. This way, if the primary datastore is unreachable, the gateway
 hosts can still be restarted successfully and provide service to the
 users.
 
+Wig attempts to be configuration-management-friendly by delegating all
+deployment-related configuration to an external CM system: all
+connection-related parameters are exposed as configuration flags and
+no information on the deployment is kept in the datastore.
+
 ### Service-to-service authentication
 
 Service components need to be able to authenticate each other. Wig
@@ -82,6 +87,21 @@ control model, with two predefined roles:
 * *follower* can only access the asynchronous replication API (read-only)
 
 ## Operations
+
+### Session identification
+
+The primary datastore component continuously receives statistics from
+the gateway nodes. It uses this data to detect *sessions*, that is, to
+some approximation, peer connections and disconnections. Since
+Wireguard does not have a concept of "connection", this is done by
+looking for time intervals when the peer is inactive.
+
+Session logs do not store PII such as the peer's IP address, but they
+can be optionally augmented with some broad location data (country,
+ASN) in order to provide meaningful access logs to users.
+
+This data also allows one to detect abandoned peer definitions that
+have not been used in a long time.
 
 ### Metrics
 
