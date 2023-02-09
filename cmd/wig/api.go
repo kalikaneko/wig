@@ -29,7 +29,7 @@ var rbacRules = map[string][]string{
 		"write-sessions", "read-sessions",
 		"read-log",
 	},
-	"gateway": []string{
+	"follower": []string{
 		"read-log",
 	},
 }
