@@ -44,6 +44,7 @@
         packages:
           - wireguard
           - netcat-openbsd
+          - iptables
 
     - name: Install systemd units
       copy:
