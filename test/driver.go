@@ -296,7 +296,14 @@ func createAnsibleInventory(path string, env *env, vm vmprovider) error {
 	for group, groupHosts := range env.Groups {
 		fmt.Fprintf(f, "[%s:children]\n%s\n\n", group, strings.Join(groupHosts, "\n"))
 	}
-	fmt.Fprintf(f, "[all:vars]\n%s\n\n", strings.Join(vm.ansibleSSHParams(), "\n"))
+	// Use a different random SSH ControlPath for fast iteration,
+	// to avoid Ansible getting stuck trying to talk to old hosts.
+	fmt.Fprintf(
+		f,
+		"[all:vars]\n%s\nansible_control_path=%%(directory)s/%s\n\n",
+		strings.Join(vm.ansibleSSHParams(), "\n"),
+		randomSmallString(),
+	)
 	return nil
 }
 
@@ -315,6 +322,15 @@ func parseGroupSpec(s string) (map[string][]string, error) {
 func randomNetwork() *net.IPNet {
 	_, n, _ := net.ParseCIDR(fmt.Sprintf("10.%d.%d.0/24", rand.Intn(255), rand.Intn(255)))
 	return n
+}
+
+// Doesn't have to be very random.
+func randomSmallString() string {
+	var s string
+	for i := 0; i < 4; i++ {
+		s += fmt.Sprintf("%08x", rand.Int63())
+	}
+	return s
 }
 
 func hostInNet(i int, network *net.IPNet) net.IP {
