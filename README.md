@@ -39,6 +39,30 @@ different outbound network configurations, in a user-visible way
 (since one would need to communicate different connection parameters
 to users). They behave as entirely separate VPN networks.
 
+#### Interface
+
+An interface represents an actual network interface on the gateway
+hosts. It has the following attributes:
+
+* *name* - Name of the interface
+* *private_key* / *public_key* - Wireguard key pair
+* *ip* / *ip6* - IPv4 and IPv6 address and mask in CIDR
+  syntax. Automatically assigned IP addresses will be taken from these
+  ranges. An interface can support either IPv4, IPv6, or both.
+* *fwmark* - Optional fwmark identifier, useful to integrate with
+  additional firewall rules on your gateway hosts.
+
+#### Peer
+
+Peers are individual Wireguard peers, and are associated to a specific
+interface. Peers are identified by their public key (in base64
+encoding, same representation that Wireguard uses).
+
+* *public_key* - Public key of the peer
+* *interface* - Name of the interface the peer is associated to
+* *ip* / *ip6* - IP address ranges allocated to this peer
+* *expire* - Timestamp of peer expiration, after which it will be
+  deleted automatically
 
 ### Deployment
 
