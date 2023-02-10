@@ -12,6 +12,7 @@ import (
 	"git.autistici.org/ai3/attic/wig/datastore/crud"
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
+	"git.autistici.org/ai3/attic/wig/datastore/expire"
 	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/datastore/registration"
 	"git.autistici.org/ai3/attic/wig/datastore/sessions"
@@ -125,6 +126,11 @@ func (c *apiCommand) run(ctx context.Context) error {
 		w = logdb
 	}
 	api := crud.Combine(crud.NewSQL(model.Model, sql), w)
+
+	// On the primary datastore, expire peers periodically.
+	if c.logURL == "" {
+		expire.Expire(ctx, sql, logdb, 30*time.Minute)
+	}
 
 	g, ctx := errgroup.WithContext(ctx)
 
