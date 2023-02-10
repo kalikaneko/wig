@@ -125,6 +125,8 @@ $ go build ./cmd/wig
 
 This will create a *wig* binary in the current directory.
 
+Note that building requires Go version 1.19 or later.
+
 ### Initializing the bearer token authentication subsystem
 
 When using bearer-token authentication mechanism it is necessary to
@@ -238,7 +240,7 @@ tokens from the process command line.
 
 ## How to test
 
-Requires Go 1.17 or newer and Ansible.
+Requires Go 1.19 or newer and Ansible.
 
 ```
 $ go build ./cmd/wig
