@@ -38,18 +38,31 @@ func (c *initCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...inte
 		return syntaxErr("must specify a database path")
 	}
 
-	return fatalErr(c.run(ctx))
+	var id, secret string
+	switch f.NArg() {
+	case 0:
+	case 2:
+		id = f.Arg(0)
+		secret = f.Arg(1)
+	default:
+		return syntaxErr("wrong number of arguments")
+	}
+
+	return fatalErr(c.run(ctx, id, secret))
 }
 
-func (c *initCommand) run(ctx context.Context) error {
+func (c *initCommand) run(ctx context.Context, id, secret string) error {
 	sql, err := sqlite.OpenDB(c.dburi, datastore.Migrations)
 	if err != nil {
 		return err
 	}
 	defer sql.Close()
 
-	id := generateRandomString()
-	secret := generateRandomString()
+	if id == "" {
+		id = generateRandomString()
+		secret = generateRandomString()
+	}
+
 	if err := sqlite.WithTx(sql, func(tx *sqlx.Tx) error {
 		_, err := tx.Exec("INSERT INTO tokens (id, secret, roles) VALUES (?, ?, 'admin')", id, secret)
 		return err

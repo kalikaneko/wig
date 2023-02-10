@@ -17,6 +17,15 @@ func ParseCIDR(s string) (*CIDR, error) {
 	return c, c.parse(s)
 }
 
+func NewCIDR(ip net.IP, sz int) *CIDR {
+	return &CIDR{
+		IPNet: net.IPNet{
+			IP:   ip,
+			Mask: net.CIDRMask(sz, 8*len(ip)),
+		},
+	}
+}
+
 func (c *CIDR) parse(s string) error {
 	if s == "" {
 		return nil
@@ -30,8 +39,12 @@ func (c *CIDR) parse(s string) error {
 	return nil
 }
 
+func (c *CIDR) IsNil() bool {
+	return c == nil || c.IPNet.IP == nil
+}
+
 func (c *CIDR) String() string {
-	if c == nil || c.IPNet.IP == nil {
+	if c.IsNil() {
 		return ""
 	}
 	return c.IPNet.String()

@@ -4,7 +4,8 @@ Wireguard VPN server
 Simple and minimal multi-gateway VPN service with separate control
 plane. Meant to support small-scale VPNs as well as multi-homed larger
 deployments. The focus is on the Internet routing use case rather than
-the "connect groups of devices" scenario (Tailscale-like).
+the "connect groups of devices" scenario (e.g. Tailscale).
+
 
 ## Architecture
 
@@ -81,12 +82,46 @@ supports two main mechanisms:
 
 The control plane API supports a rudimentary
 [RBAC](https://en.wikipedia.org/wiki/Role-based_access_control) access
-control model, with two predefined roles:
+control model, with the following predefined roles:
 
 * *admin* has full access to the API
 * *follower* can only access the asynchronous replication API (read-only)
+* *registrar* can only access the peer registration API
 
 ## Operations
+
+### Installation
+
+The software ships as a single binary with no dependencies. To build
+it, from the root of this repository, run:
+
+```shell
+$ go build ./cmd/wig
+```
+
+This will create a *wig* binary in the current directory.
+
+### Initializing the bearer token authentication subsystem
+
+When using bearer-token authentication mechanism it is necessary to
+manually initialize the database with an "admin" token, so that the
+command-line tool can perform administrative operations on the
+network.
+
+This is done by running, on the primary datastore host, the following
+command:
+
+```shell
+$ wig init --db=/path/to/your/db.sqlite
+{"id":"NVPlVyMU7yRuBFQ8E3JJj7WvnIdDjpac","secret":"ypUKa5dl8fKLkehfCQzECendFTdmnjbt"}
+```
+
+The tool will create a new authentication token with *admin* role, and
+output the token and its associated secret as JSON.
+
+For better compatibility with configuration management systems, it is
+also possible to specify the token ID and secret as command-line
+arguments, instead of letting the tool generate them.
 
 ### Session identification
 
@@ -122,6 +157,50 @@ So, in case of a restore of the primary datastore from an (older)
 backup, there should be nothing to do except accepting the loss of
 data. This is why this system is not a replicated data store, but it's
 best to think of it as a *data flow* engine.
+
+## API
+
+The primary datastore offers a HTTP API with some methods that can be
+useful for integration.
+
+All HTTP API methods expect to receive POST requests, with an optional
+JSON-encoded request body (and a Content-Type of
+*application/json*). Responses will be also JSON-encoded.
+
+#### `/api/v1/register-peer`
+
+Request attributes:
+
+* *interface* - Interface name
+* *public_key* - Public key of the peer
+* *ttl* - TTL in seconds
+
+Create a new peer and allocate free IP addresses for it. The new peer
+will get IPv4 / IPv6 addresses depending on the networks defined on
+the specified interface.
+
+RBAC target: *register-peer* (included in the default roles *admin*
+and *registrar*).
+
+## Command-line tool
+
+The software comes with a command-line tool, *wig*, that can start the
+various components and that offers access to administrative
+functionality.
+
+The tool talks to the primary datastore server over HTTP, and it is
+meant to be used with *admin* authentication credentials. All admin
+commands support the *--auth-token* and *--auth-secret* flags to set
+these credentials.
+
+The tool offers a series of CRUD data manipulation commands for the
+various object types stored in the datastore. These commands will have
+an immediate effect on the gateway configuration. Create / update /
+delete commands apply to an individual object whose primary key and
+attributes can be set via command-line flags. The *get* command
+requires an object's primary key as an argument. The *find* command
+will instead accept command-line arguments in *attribute=value* form
+(including the empty query) and will print all matching objects.
 
 ## How to test
 

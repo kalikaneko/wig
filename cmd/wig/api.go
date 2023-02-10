@@ -14,6 +14,7 @@ import (
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
 	"git.autistici.org/ai3/attic/wig/datastore/model"
+	"git.autistici.org/ai3/attic/wig/datastore/registration"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"git.autistici.org/ai3/attic/wig/util"
 	"github.com/google/subcommands"
@@ -28,9 +29,13 @@ var rbacRules = map[string][]string{
 		"write-token", "read-token",
 		"write-sessions", "read-sessions",
 		"read-log",
+		"register-peer",
 	},
 	"follower": []string{
 		"read-log",
+	},
+	"registrar": []string{
+		"register-peer",
 	},
 }
 
@@ -121,11 +126,6 @@ func (c *apiCommand) run(ctx context.Context) error {
 	}
 	api := crud.Combine(crud.NewSQL(model.Model, sql), w)
 
-	stats, err := collector.NewStatsReceiver(sql)
-	if err != nil {
-		return err
-	}
-
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Start the follower.
@@ -157,15 +157,27 @@ func (c *apiCommand) run(ctx context.Context) error {
 			api,
 			apiURLBase,
 		))
+
 		logH := crudlog.NewLogSourceHTTPHandler(
 			logdb,
 			model.Model.Encoding(),
 		)
 		defer logH.Close()
 		httpAPI.Add(logH)
+
+		// Optional components of the HTTP server, that should
+		// only run on primary datastore nodes.
 		if c.logURL == "" {
+			stats, err := collector.NewStatsReceiver(sql)
+			if err != nil {
+				return err
+			}
 			httpAPI.Add(stats)
+
+			reg := registration.NewRegistrationAPI(sql)
+			httpAPI.Add(reg)
 		}
+
 		server := &http.Server{
 			Addr:              c.addr,
 			Handler:           httpAPI,
