@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
@@ -46,7 +47,7 @@ func (r *remotePubsubClient) Snapshot(ctx context.Context) (Snapshot, error) {
 			err = maybeTempError(err)
 			return
 		},
-		backoff.WithContext(httptransport.RetryPolicy, ctx),
+		backoff.WithContext(retryPolicy, ctx),
 	)
 	return snap, err
 }
@@ -65,7 +66,7 @@ func (r *remotePubsubClient) Subscribe(ctx context.Context, start Sequence) (Sub
 			err = maybeTempError(err)
 			return
 		},
-		backoff.WithContext(httptransport.RetryPolicy, ctx),
+		backoff.WithContext(retryPolicy, ctx),
 	)
 	return sub, err
 }
@@ -260,4 +261,18 @@ func maybeTempError(err error) error {
 		}
 	}
 	return err
+}
+
+// The log client uses a custom backoff policy that will back off
+// exponentially up to a relatively short interval, and will just keep
+// retrying forever (until the context is canceled).
+var retryPolicy = newPermanentRetryBackOff()
+
+func newPermanentRetryBackOff() backoff.BackOff {
+	exp := backoff.NewExponentialBackOff()
+	exp.InitialInterval = 200 * time.Millisecond
+	exp.RandomizationFactor = 0.2
+	exp.MaxInterval = 60 * time.Second
+	exp.MaxElapsedTime = 0
+	return exp
 }
