@@ -130,6 +130,10 @@ func (s *memSnapshot) Each(f func(interface{}) error) error {
 
 func (s *crudLogSource) Subscribe(_ context.Context, start Sequence) (sub Subscription, err error) {
 	err = s.db.WithTransaction(func(tx Transaction) error {
+		if start > (s.impl.GetSequence(tx) + 1) {
+			return ErrHorizon
+		}
+
 		preload, err := s.impl.QueryLogSince(tx, start)
 		if err != nil {
 			return err
