@@ -67,7 +67,7 @@ func (r *command) Usage() string {
 }
 
 func (r *command) SetFlags(f *flag.FlagSet) {
-	f.StringVar(&r.urlFlag, "url", "", "API server `URL`")
+	f.StringVar(&r.urlFlag, "url", util.FlagDefault("url", ""), "API server `URL`")
 	r.ClientCommand.SetFlags(f)
 }
 

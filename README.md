@@ -226,6 +226,16 @@ requires an object's primary key as an argument. The *find* command
 will instead accept command-line arguments in *attribute=value* form
 (including the empty query) and will print all matching objects.
 
+Commands can read their flags from a configuration file: by default
+the tool will look for it in /etc/wig.conf and ~/.wig.conf, but this
+can be overridden using the *--config* command-line parameter (which
+must be placed before the command, thanks to idiosyncrasies of the Go
+flag parsing code). This configuration file should consist of *flag
+name* and *value* pairs, separated by a space, one per line. Comments,
+introduced by a # character, are allowed. Using configuration files
+makes it possible to hide sensitive parameters such as authentication
+tokens from the process command line.
+
 ## How to test
 
 Requires Go 1.17 or newer and Ansible.

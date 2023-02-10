@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"git.autistici.org/ai3/attic/wig/util"
 	"github.com/google/subcommands"
 )
 
@@ -25,7 +26,9 @@ func fatalErr(err error) subcommands.ExitStatus {
 }
 
 func init() {
+	subcommands.ImportantFlag("config")
 	subcommands.Register(subcommands.HelpCommand(), "documentation")
+	subcommands.Register(subcommands.FlagsCommand(), "documentation")
 }
 
 func withInterruptibleContext(ctx context.Context, f func(ctx context.Context)) {
@@ -43,9 +46,15 @@ func withInterruptibleContext(ctx context.Context, f func(ctx context.Context)) 
 	f(ctx)
 }
 
+var configFilePath = flag.String("config", "", "config file with flags (default: /etc/wig.conf, ~/.wig.conf if they exist)")
+
 func main() {
 	log.SetFlags(0)
 	flag.Parse()
+
+	if err := util.LoadFlagsFromConfig(*configFilePath); err != nil {
+		log.Fatal(err)
+	}
 
 	var status int
 	withInterruptibleContext(

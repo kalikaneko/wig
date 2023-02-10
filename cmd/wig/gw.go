@@ -24,7 +24,7 @@ type gwCommand struct {
 	httpAddr  string
 }
 
-func (c *gwCommand) Name() string     { return "gw" }
+func (c *gwCommand) Name() string     { return "gateway" }
 func (c *gwCommand) Synopsis() string { return "run the gateway node" }
 func (c *gwCommand) Usage() string {
 	return `gw
@@ -86,4 +86,5 @@ func (c *gwCommand) run(ctx context.Context) error {
 
 func init() {
 	subcommands.Register(&gwCommand{}, "")
+	subcommands.Register(subcommands.Alias("gw", &gwCommand{}), "")
 }

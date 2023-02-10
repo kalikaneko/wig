@@ -15,8 +15,8 @@ type ClientCommand struct {
 }
 
 func (c *ClientCommand) SetFlags(f *flag.FlagSet) {
-	f.StringVar(&c.authToken, "auth-token", "", "token ID for authentication")
-	f.StringVar(&c.authSecret, "auth-secret", "", "secret for authentication")
+	f.StringVar(&c.authToken, "auth-token", FlagDefault("auth-token", ""), "token ID for authentication")
+	f.StringVar(&c.authSecret, "auth-secret", FlagDefault("auth-secret", ""), "secret for authentication")
 	c.ClientTLSFlags.SetFlags(f)
 }
 

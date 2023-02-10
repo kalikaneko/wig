@@ -27,9 +27,9 @@ type ClientTLSFlags struct {
 }
 
 func (c *ClientTLSFlags) SetFlags(f *flag.FlagSet) {
-	f.StringVar(&c.cert, "ssl-client-cert", "", "SSL certificate `path` (client)")
-	f.StringVar(&c.key, "ssl-client-key", "", "SSL private key `path` (client)")
-	f.StringVar(&c.ca, "ssl-client-ca", "", "SSL CA `path` (client)")
+	f.StringVar(&c.cert, "ssl-client-cert", FlagDefault("ssl-client-cert", ""), "SSL certificate `path` (client)")
+	f.StringVar(&c.key, "ssl-client-key", FlagDefault("ssl-client-key", ""), "SSL private key `path` (client)")
+	f.StringVar(&c.ca, "ssl-client-ca", FlagDefault("ssl-client-ca", ""), "SSL CA `path` (client)")
 }
 
 func (c *ClientTLSFlags) TLSClientConfig() (*tls.Config, error) {
