@@ -1,4 +1,4 @@
-module git.autistici.org/ai3/attic/wig
+module git.autistici.org/ai3/tools/wig
 
 go 1.19
 

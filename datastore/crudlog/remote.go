@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"time"
 
-	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
-	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
+	"git.autistici.org/ai3/tools/wig/datastore/crud/httpapi"
+	"git.autistici.org/ai3/tools/wig/datastore/crud/httptransport"
 	"github.com/cenkalti/backoff/v4"
 )
 

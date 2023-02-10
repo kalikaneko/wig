@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"git.autistici.org/ai3/attic/wig/datastore/model"
+	"git.autistici.org/ai3/tools/wig/datastore/model"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )

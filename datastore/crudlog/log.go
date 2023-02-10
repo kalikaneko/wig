@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
+	"git.autistici.org/ai3/tools/wig/datastore/sqlite"
 	"github.com/jmoiron/sqlx"
 )
 

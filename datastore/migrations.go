@@ -1,6 +1,6 @@
 package datastore
 
-import "git.autistici.org/ai3/attic/wig/datastore/sqlite"
+import "git.autistici.org/ai3/tools/wig/datastore/sqlite"
 
 var Migrations = []sqlite.Migration{
 	sqlite.Statement(`

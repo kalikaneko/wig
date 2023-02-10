@@ -1,6 +1,6 @@
 package model
 
-import "git.autistici.org/ai3/attic/wig/datastore/crud"
+import "git.autistici.org/ai3/tools/wig/datastore/crud"
 
 var Model *crud.Model
 

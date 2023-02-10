@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"reflect"
 
-	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
+	"git.autistici.org/ai3/tools/wig/datastore/crud/httptransport"
 )
 
 type typeClient struct {

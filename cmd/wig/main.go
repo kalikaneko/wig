@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"git.autistici.org/ai3/attic/wig/util"
+	"git.autistici.org/ai3/tools/wig/util"
 	"github.com/google/subcommands"
 )
 

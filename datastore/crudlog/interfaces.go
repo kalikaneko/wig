@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"git.autistici.org/ai3/attic/wig/datastore/crud"
+	"git.autistici.org/ai3/tools/wig/datastore/crud"
 	"github.com/jmoiron/sqlx"
 )
 

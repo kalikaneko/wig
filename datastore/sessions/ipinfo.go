@@ -5,7 +5,7 @@ import (
 	"net"
 	"os"
 
-	"git.autistici.org/ai3/attic/wig/datastore/model"
+	"git.autistici.org/ai3/tools/wig/datastore/model"
 	"github.com/oschwald/maxminddb-golang"
 )
 

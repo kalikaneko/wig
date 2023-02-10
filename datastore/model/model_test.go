@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"git.autistici.org/ai3/attic/wig/datastore"
-	"git.autistici.org/ai3/attic/wig/datastore/crud"
-	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
-	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
-	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
+	"git.autistici.org/ai3/tools/wig/datastore"
+	"git.autistici.org/ai3/tools/wig/datastore/crud"
+	"git.autistici.org/ai3/tools/wig/datastore/crud/httpapi"
+	"git.autistici.org/ai3/tools/wig/datastore/crudlog"
+	"git.autistici.org/ai3/tools/wig/datastore/sqlite"
 	"github.com/google/go-cmp/cmp"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )

@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"git.autistici.org/ai3/attic/wig/datastore"
-	"git.autistici.org/ai3/attic/wig/datastore/model"
-	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
-	"git.autistici.org/ai3/attic/wig/gateway"
+	"git.autistici.org/ai3/tools/wig/datastore"
+	"git.autistici.org/ai3/tools/wig/datastore/model"
+	"git.autistici.org/ai3/tools/wig/datastore/sqlite"
+	"git.autistici.org/ai3/tools/wig/gateway"
 )
 
 type testData struct {

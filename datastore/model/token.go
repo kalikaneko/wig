@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"strings"
 
-	"git.autistici.org/ai3/attic/wig/datastore/crud"
+	"git.autistici.org/ai3/tools/wig/datastore/crud"
 )
 
 type Token struct {

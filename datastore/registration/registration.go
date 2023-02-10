@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
-	"git.autistici.org/ai3/attic/wig/datastore/crud/httptransport"
-	"git.autistici.org/ai3/attic/wig/datastore/model"
-	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
+	"git.autistici.org/ai3/tools/wig/datastore/crud/httpapi"
+	"git.autistici.org/ai3/tools/wig/datastore/crud/httptransport"
+	"git.autistici.org/ai3/tools/wig/datastore/model"
+	"git.autistici.org/ai3/tools/wig/datastore/sqlite"
 	"github.com/jmoiron/sqlx"
 	"github.com/yl2chen/cidranger"
 )
