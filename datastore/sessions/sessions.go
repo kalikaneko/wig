@@ -1,4 +1,4 @@
-package collector
+package sessions
 
 import (
 	"log"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"git.autistici.org/ai3/attic/wig/datastore/model"
-	"git.autistici.org/ai3/attic/wig/datastore/sessiondb"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"git.autistici.org/ai3/attic/wig/gateway"
 	"github.com/jmoiron/sqlx"
@@ -50,7 +49,7 @@ func NewSessionFinder(db *sqlx.DB) (*SessionFinder, error) {
 	}
 
 	// nolint: errcheck
-	sessiondb.WithTx(db, func(tx sessiondb.Tx) error {
+	WithTx(db, func(tx Tx) error {
 		sf.activeSessions = tx.GetActiveSessions()
 		sf.lastHandshake = tx.GetLastHandshakeTimes()
 		return sqlite.ErrRollback
@@ -76,7 +75,7 @@ func (f *SessionFinder) dumper(db *sqlx.DB) {
 	for {
 		select {
 		case <-tick.C:
-			if err := sessiondb.WithTx(db, func(tx sessiondb.Tx) error {
+			if err := WithTx(db, func(tx Tx) error {
 				return tx.DumpActiveSessions(f.ActiveSessions())
 			}); err != nil {
 				log.Printf("data dump failed: %v", err)

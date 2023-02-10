@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"time"
 
-	"git.autistici.org/ai3/attic/wig/collector"
 	"git.autistici.org/ai3/attic/wig/datastore"
 	"git.autistici.org/ai3/attic/wig/datastore/crud"
 	"git.autistici.org/ai3/attic/wig/datastore/crud/httpapi"
 	"git.autistici.org/ai3/attic/wig/datastore/crudlog"
 	"git.autistici.org/ai3/attic/wig/datastore/model"
 	"git.autistici.org/ai3/attic/wig/datastore/registration"
+	"git.autistici.org/ai3/attic/wig/datastore/sessions"
 	"git.autistici.org/ai3/attic/wig/datastore/sqlite"
 	"git.autistici.org/ai3/attic/wig/util"
 	"github.com/google/subcommands"
@@ -168,7 +168,7 @@ func (c *apiCommand) run(ctx context.Context) error {
 		// Optional components of the HTTP server, that should
 		// only run on primary datastore nodes.
 		if c.logURL == "" {
-			stats, err := collector.NewStatsReceiver(sql)
+			stats, err := sessions.NewSessionManager(sql)
 			if err != nil {
 				return err
 			}

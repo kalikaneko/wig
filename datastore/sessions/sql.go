@@ -1,4 +1,4 @@
-package sessiondb
+package sessions
 
 import (
 	"log"
