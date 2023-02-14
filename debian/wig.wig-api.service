@@ -1,0 +1,21 @@
+[Unit]
+After=network.target
+Description=Wireguard VPN API service
+
+[Service]
+ConditionPathExists=/etc/default/wig-api
+EnvironmentFile=/etc/default/wig-api
+ExecStart=/usr/bin/wig api --db=/var/lib/wig/wig.sqlite $ARGS
+Restart=always
+RestartSec=3s
+LimitNOFILE=65535
+User=_wig
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=full
+ReadOnlyDirectories=/
+ReadWriteDirectories=/var/lib/wig
+
+[Install]
+WantedBy=multi-user.target

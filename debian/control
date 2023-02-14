@@ -1,0 +1,14 @@
+Source: wig
+Section: admin
+Priority: optional
+Maintainer: Autistici/Inventati <debian@autistici.org>
+Build-Depends: debhelper (>=12), golang (>=1.19), dh-golang
+Standards-Version: 3.9.6
+XS-Go-Import-Path: git.autistici.org/ai3/tools/wig
+
+Package: wig
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, iptables
+Description: Wireguard VPN solution
+ Simple multi-server Wireguard VPN solution.
+
