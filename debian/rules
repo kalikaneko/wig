@@ -10,6 +10,7 @@ override_dh_auto_install:
 
 override_dh_installsystemd:
 	dh_installsysusers
+	dh_installtmpfiles
 	dh_installsystemd --name wig-api
 	dh_installsystemd --name wig-gateway
 
