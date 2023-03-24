@@ -1,5 +1,5 @@
 include:
-  - "https://git.autistici.org/ai3/build-deb/raw/master/ci-common.yml"
+  - "https://git.autistici.org/ai3/build-deb/raw/master/ci-bookworm.yml"
 
 test_go:
   stage: test
