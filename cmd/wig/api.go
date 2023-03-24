@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"log"
@@ -184,13 +185,7 @@ func (c *apiCommand) run(ctx context.Context) error {
 			httpAPI.Add(reg)
 		}
 
-		server := &http.Server{
-			Addr:              c.addr,
-			Handler:           httpAPI,
-			ReadHeaderTimeout: 10 * time.Second,
-			IdleTimeout:       900 * time.Second,
-			TLSConfig:         tlsConf,
-		}
+		server := makeHTTPServer(httpAPI, c.addr, tlsConf)
 		return runHTTPServerWithContext(ctx, server)
 	})
 
@@ -199,6 +194,16 @@ func (c *apiCommand) run(ctx context.Context) error {
 
 func init() {
 	subcommands.Register(&apiCommand{}, "")
+}
+
+func makeHTTPServer(h http.Handler, addr string, tlsConf *tls.Config) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       900 * time.Second,
+		TLSConfig:         tlsConf,
+	}
 }
 
 func runHTTPServerWithContext(ctx context.Context, server *http.Server) error {

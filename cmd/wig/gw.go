@@ -78,7 +78,8 @@ func (c *gwCommand) run(ctx context.Context) error {
 	g.Go(func() error {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
-		return http.ListenAndServe(c.httpAddr, mux)
+		server := makeHTTPServer(mux, c.httpAddr, nil)
+		return runHTTPServerWithContext(ctx, server)
 	})
 
 	return g.Wait()
