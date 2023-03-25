@@ -1,10 +1,8 @@
 package gateway
 
 import (
-	"errors"
 	"fmt"
 	"log"
-	"os"
 
 	"git.autistici.org/ai3/tools/wig/datastore/model"
 	"github.com/vishvananda/netlink"
@@ -24,14 +22,10 @@ func newInterface(ctrl *wgctrl.Client, intf *model.Interface) (*wgInterface, err
 		ctrl:      ctrl,
 	}
 
-	err := wgi.initialize()
-	if errors.Is(err, os.ErrNotExist) {
-		if err = wgi.startInterface(); err != nil {
-			return nil, err
-		}
-		err = wgi.initialize()
+	if err := wgi.startInterface(); err != nil {
+		return nil, err
 	}
-	if err != nil {
+	if err := wgi.initialize(); err != nil {
 		return nil, err
 	}
 
