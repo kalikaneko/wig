@@ -164,6 +164,7 @@ func (n *Gateway) applyInterface(opType crudlog.OpType, intf *model.Interface) e
 		if _, ok := n.intfs[intf.Name]; !ok {
 			return errors.New("interface does not exist")
 		}
+		n.intfs[intf.Name].stopInterface() // nolint: errcheck
 		delete(n.intfs, intf.Name)
 	}
 	return nil
