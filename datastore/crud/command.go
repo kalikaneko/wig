@@ -209,7 +209,7 @@ func (c *restFindCommand) Execute(ctx context.Context, f *flag.FlagSet, args ...
 
 	query := make(map[string]string)
 	for _, arg := range f.Args() {
-		parts := strings.SplitN(arg, "=", 1)
+		parts := strings.SplitN(arg, "=", 2)
 		if len(parts) != 2 {
 			return fatalErr(errors.New("could not parse query as attr=value"))
 		}
