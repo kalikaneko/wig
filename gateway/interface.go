@@ -3,9 +3,11 @@ package gateway
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"git.autistici.org/ai3/tools/wig/datastore/model"
+	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -69,50 +71,66 @@ func (i *wgInterface) initialize() error {
 	return i.configureWGDevice(cfg)
 }
 
-func (i *wgInterface) chains() (string, string) {
-	return fmt.Sprintf("wg-%s-in", i.Name),
-		fmt.Sprintf("wg-%s-out", i.Name)
+// netlink pkg still lacks Wireguard type.
+type wireguard struct {
+	netlink.LinkAttrs
+}
+
+func (wg *wireguard) Attrs() *netlink.LinkAttrs {
+	return &wg.LinkAttrs
+}
+
+func (wg *wireguard) Type() string {
+	return "wireguard"
 }
 
 func (i *wgInterface) startInterface() error {
-	chainIn, chainOut := i.chains()
-	return runMany(
-		ignoreErrs(
-			newCmd("ip", "link", "set", i.Name, "down"),
-			newCmd("ip", "link", "del", "dev", i.Name),
-			newCmd("iptables", "-N", chainIn),
-			newCmd("iptables", "-N", chainOut),
-			newCmd("iptables", "-D", "FORWARD", "-i", i.Name, "-j", chainIn),
-			newCmd("iptables", "-D", "FORWARD", "-o", i.Name, "-j", chainOut),
-		),
+	// Bring the device down if it's currently up.
+	if lnk, err := netlink.LinkByName(i.Name); err == nil {
+		if err := netlink.LinkSetDown(lnk); err != nil {
+			return fmt.Errorf("ip link set %s down: %w", i.Name, err)
+		}
+		if err := netlink.LinkDel(lnk); err != nil {
+			return fmt.Errorf("ip del %s: %w", i.Name, err)
+		}
+	}
 
-		newCmd("ip", "link", "add", "dev", i.Name, "type", "wireguard"),
-		newCmd("ip", "address", "add", "dev", i.Name, i.IP.String()),
-		newCmd("ip", "link", "set", "mtu", "1420", "dev", i.Name),
+	log.Printf("configuring network interface %s", i.Name)
 
-		newCmd("iptables", "-F", chainIn),
-		newCmd("iptables", "-F", chainOut),
-		newCmd("iptables", "-A", chainOut, "-p", "tcp", "--dport", "25", "-j", "DROP"),
-		newCmd("iptables", "-A", chainOut, "-j", "ACCEPT"),
-		newCmd("iptables", "-A", chainIn, "-p", "tcp", "--dport", "25", "-j", "DROP"),
-		newCmd("iptables", "-A", chainIn, "-j", "ACCEPT"),
-		newCmd("iptables", "-A", "FORWARD", "-i", i.Name, "-j", chainIn),
-		newCmd("iptables", "-A", "FORWARD", "-o", i.Name, "-j", chainOut),
-		newCmd("ip", "link", "set", i.Name, "up"),
-	)
+	attrs := netlink.NewLinkAttrs()
+	attrs.Name = i.Name
+	attrs.MTU = 1420
+	lnk := &wireguard{LinkAttrs: attrs}
+	if err := netlink.LinkAdd(lnk); err != nil {
+		return fmt.Errorf("ip link add %s: %w", i.Name, err)
+	}
+	if i.IP != nil {
+		if err := netlink.AddrAdd(lnk, &netlink.Addr{IPNet: &i.IP.IPNet}); err != nil {
+			return fmt.Errorf("ip addr add %s: %w", i.Name, err)
+		}
+	}
+	if i.IP6 != nil {
+		if err := netlink.AddrAdd(lnk, &netlink.Addr{IPNet: &i.IP6.IPNet}); err != nil {
+			return fmt.Errorf("ip addr add %s: %w", i.Name, err)
+		}
+	}
+
+	return netlink.LinkSetUp(lnk)
 }
 
 func (i *wgInterface) stopInterface() error {
-	chainIn, chainOut := i.chains()
-	return runMany(
-		newCmd("ip", "link", "set", i.Name, "down"),
-		newCmd("ip", "link", "del", "dev", i.Name),
+	log.Printf("stopping network interface %s", i.Name)
 
-		newCmd("iptables", "-D", "FORWARD", "-i", i.Name, "-j", chainIn),
-		newCmd("iptables", "-D", "FORWARD", "-o", i.Name, "-j", chainOut),
-		newCmd("iptables", "-F", chainIn),
-		newCmd("iptables", "-F", chainOut),
-		newCmd("iptables", "-X", chainIn),
-		newCmd("iptables", "-X", chainOut),
-	)
+	lnk, err := netlink.LinkByName(i.Name)
+	if err != nil {
+		return nil
+	}
+
+	if err := netlink.LinkSetDown(lnk); err != nil {
+		return fmt.Errorf("ip link set %s down: %w", i.Name, err)
+	}
+	if err := netlink.LinkDel(lnk); err != nil {
+		return fmt.Errorf("ip del %s: %w", i.Name, err)
+	}
+	return nil
 }
