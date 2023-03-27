@@ -72,3 +72,35 @@ func TestSessionFinder(t *testing.T) {
 		t.Fatalf("there are %d active sessions, expected 0", n)
 	}
 }
+
+func TestSessionDumper(t *testing.T) {
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := sqlite.OpenDB(dir+"/sf.sql", datastore.Migrations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	sf, _ := NewSessionFinder(db)
+
+	t0 := time.Now()
+	processStats(t, sf, []testData{
+		{
+			PeerStats: gateway.PeerStats{
+				PublicKey:         "pk1",
+				LastHandshakeTime: t0,
+			},
+			t: t0,
+		},
+	})
+
+	err = WithTx(db, func(tx Tx) error {
+		return tx.DumpActiveSessions(sf.ActiveSessions())
+	})
+	if err != nil {
+		t.Fatalf("DumpActiveSessions: %v", err)
+	}
+}

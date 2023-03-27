@@ -44,7 +44,7 @@ INSERT INTO sequence (seq) VALUES (0);
 `, `
 CREATE TABLE active_sessions (
   peer_public_key SMALLTEXT,
-  begin_timestamp DATETIME
+  begin_timestamp DATETIME,
   end_timestamp DATETIME,
   last_handshake DATETIME,
   active BOOL,
@@ -67,5 +67,18 @@ CREATE TABLE tokens (
   secret TEXT NOT NULL,
   roles TEXT
 )
+`),
+	sqlite.Statement(`
+ALTER TABLE active_sessions ADD COLUMN src_as_num SMALLTEXT
+`, `
+ALTER TABLE active_sessions ADD COLUMN src_as_org SMALLTEXT
+`, `
+ALTER TABLE active_sessions DROP COLUMN src_as
+`, `
+ALTER TABLE sessions ADD COLUMN src_as_num SMALLTEXT
+`, `
+ALTER TABLE sessions ADD COLUMN src_as_org SMALLTEXT
+`, `
+ALTER TABLE sessions DROP COLUMN src_as
 `),
 }
