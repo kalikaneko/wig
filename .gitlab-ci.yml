@@ -1,11 +1,6 @@
 include:
-  - "https://git.autistici.org/ai3/build-deb/raw/master/ci-bookworm.yml"
-
-test_go:
-  stage: test
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/golang:1.19
-  script:
-    - go test -v ./...
+  - "https://git.autistici.org/pipelines/debian/raw/master/common.yml"
+  - "https://git.autistici.org/pipelines/images/test/golang/raw/master/ci.yml"
 
 test_vagrant:
   stage: test
