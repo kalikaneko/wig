@@ -25,7 +25,7 @@ var (
 	vagrantfileTplSrc = `
 require 'yaml'
 Vagrant.configure(2) do |config|
-  config.vm.box = "debian/bullseye64"
+  config.vm.box = "debian/bookworm64"
   config.vm.synced_folder ".", "/vagrant", disabled: true
 {{range $h := .Hosts}}
   config.vm.define '{{$h.Name}}' do |m|
