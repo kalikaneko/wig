@@ -102,7 +102,7 @@ func (r *RegistrationAPI) nextFreeIP(tx *sqlx.Tx, ipnet *model.CIDR, allocated c
 }
 
 func (r *RegistrationAPI) allocatedRanges(tx *sqlx.Tx, intfName string) (cidranger.Ranger, error) {
-	rows, err := tx.Queryx("SELECT ip, ip6 FROM peer WHERE interface = ?", intfName)
+	rows, err := tx.Queryx("SELECT ip, ip6 FROM peers WHERE interface = ?", intfName)
 	if err != nil {
 		return nil, err
 	}
